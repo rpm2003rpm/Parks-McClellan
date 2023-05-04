@@ -109,6 +109,13 @@ def findExtrema(E, n, d, wtol = 1e-6, ytol = 1e-5):
     i = np.flip(np.argsort(err[ind]))
     extrema = x[ind[i[0:(n+2)]]]
     extrema = np.flip(extrema[np.argsort(extrema)])
+    #errd    = np.insert(err, 0, 0)
+    #errd    = np.append(errd, 0)
+    #k       = np.diff(np.diff(errd) > 0)
+    #up      = np.argwhere(k)[0::2,0]
+    #i       = np.flip(np.argsort(err[up]))
+    #extrema = x[up[i[0:(n+2)]]]
+    #extrema = np.flip(extrema[np.argsort(extrema)])
     if len(extrema) < n + 2:
         plt.plot(np.arccos(x), 
                  np.log10(err))
@@ -169,7 +176,7 @@ if __name__ == "__main__":
     #---------------------------------------------------------------------------
     # Band pass design
     #---------------------------------------------------------------------------
-    n = 20
+    n = 40
     H = lambda x: Hbp(np.cos(wstop1), np.cos(wpass1), \
                       np.cos(wpass2), np.cos(wstop2), x)
     iterations, d, hk = parksMcClellan(H, n, ytol = 1e-4)
