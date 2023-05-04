@@ -1,6 +1,6 @@
 ## @package parksMcClellan
 #  Simple implementation of the parksMcClellan algorithm. Convergence is painful 
-#  for filters of order 50 or higher.
+#  for in a few conditions. Not quite sure why.
 # 
 #  @author  Rodrigo Pedroso Mendes
 #  @version V1.0
@@ -62,6 +62,12 @@ def Hbp(xstop1, xpass1, xpass2, xstop2, x):
     return Hlp(xpass2, xstop2, x)*Hhp(xstop1, xpass1, x)
 
 #-------------------------------------------------------------------------------
+## TF of a fancy filter
+#-------------------------------------------------------------------------------
+def Hexp(x):
+    return np.exp(-2*np.arccos(x)/np.pi)
+
+#-------------------------------------------------------------------------------
 ## Gamma
 #-------------------------------------------------------------------------------
 def gk(k, extrema):
@@ -78,50 +84,81 @@ def delta(extrema, H):
         
 #-------------------------------------------------------------------------------
 ## find the extreme points
-#  @param x x points
-#  @param error calculated error
-#  @param order of the polynomial
+#  @param E pointer to error function
+#  @param n number of extreme points
+#  @param d calculated error
+#  @param xtol x tolerance
+#  @param ytol y tolerance
 #  @return array of extreme points
 #
 #-------------------------------------------------------------------------------
-def findExtrema(x, error, n):
-    deriv = np.ediff1d(error)
-    index = np.where(np.diff(np.sign(deriv)))[0]
-    if deriv[0]*error[0] < 0:
-        index = np.insert(index, 0, 0)
-    if deriv[-1]*error[-1] > 0:
-        index = np.append(index, len(error) - 1)
-    y = np.absolute(error[index])
-    i = np.flip(np.argsort(y))
-    extrema = x[index[i[0:(n+2)]]]
+def findExtrema(E, n, d, xtol = 1e-6, ytol = 1e-12):
+
+    #Experimentation based on derivative
+    #deriv = np.ediff1d(error)
+    #index = np.where(np.diff(np.sign(deriv)))[0]
+    #if deriv[0]*error[0] < 0:
+    #    index = np.insert(index, 0, 0)
+    #if deriv[-1]*error[-1] > 0:
+    #    index = np.append(index, len(error) - 1)
+    #y = np.absolute(error[index])
+    #i = np.flip(np.argsort(y))
+    #extrema = x[index[i[0:(n+2)]]]
+
+
+    #Based on maximum that exceeds abs(d)
+    x   = np.linspace(1, -1, num=int(2.0/xtol))
+    err = np.absolute(E(x))
+    ins = False
+    d   = abs(d)
+    ind = np.array([], dtype = np.int64)
+    for i in range(0, len(x)):
+        if (err[i] - abs(d)*0.99) > ytol:
+            if (not ins) or ((err[i] - merr) > ytol):
+                imax = i
+                merr = err[i]
+                ins  = True
+        elif ins:
+            ind = np.append(ind, imax)
+            ins = False
+    if ins:
+        ind = np.append(ind, imax)
+
+    i = np.flip(np.argsort(err[ind]))
+    extrema = x[ind[i[0:(n+2)]]]
     extrema = np.flip(extrema[np.argsort(extrema)])
-    extrema = np.unique(extrema)
     assert len(extrema) == n + 2, "Something went wrong"
     return extrema
 
 #-------------------------------------------------------------------------------
 ## parksMcClellan algorithm
 #  @param n order of the filter
+#  @param maxiter maximum iteration
 #  @param step x axis resolution for calculation of the extrema
 #  @return error and filter coefficients
 #
 #-------------------------------------------------------------------------------
-def parksMcClellan(H, n, step = 1e-5):
+def parksMcClellan(H, n, maxiter = 100, eacc = 0.0001):
     assert n%2 == 0, "n must be even" 
     n = int(n/2)
-    x = np.linspace(1, -1, num = int(2.0/step), dtype = np.float64)
     extrema = np.cos(np.linspace(0, np.pi, num=(n+2), dtype = np.float64))
     pm = np.array([(-1.0)**(i%2)  for i in range(1, len(extrema))])
     d = delta(extrema, H)    
     old_d = 1000
     lagrange_int = lagrange(extrema[:-1], H(extrema[:-1]) + d*pm)
     iterations = 0
-    while old_d/d > 1.0000001 or old_d/d < 0.9999999:
-        extrema = findExtrema(x, H(x) - lagrange_int(x), n)
+    while (old_d/d > (1 + eacc/100.0) or old_d/d < (1 - eacc/100.0)) and \
+           iterations < maxiter:
+        extrema = findExtrema(lambda x: (H(x) - lagrange_int(x)), n, d)
         old_d = d
         d = delta(extrema, H)    
         lagrange_int = lagrange(extrema[:-1], H(extrema[:-1]) + d*pm)
         iterations = iterations + 1
+    x = np.linspace(1, -1, num=10000)
+    plt.plot(x, H(x)-lagrange_int(x))
+    plt.xlabel('Cos(w)')
+    plt.ylabel('Error')
+    plt.show()
     bk = Polynomial(lagrange_int.coef[::-1]).coef   
     tk = np.polynomial.chebyshev.poly2cheb(bk)
     hk = np.append(np.flip(tk[1:]/2.0), tk[0])
@@ -132,7 +169,6 @@ def parksMcClellan(H, n, step = 1e-5):
 ## Main
 #-------------------------------------------------------------------------------
 if __name__ == "__main__":
-    n = 30
     wstop1 = 0.3*np.pi
     wpass1 = 0.4*np.pi
     wpass2 = 0.6*np.pi
@@ -141,16 +177,16 @@ if __name__ == "__main__":
     #---------------------------------------------------------------------------
     # Band pass design
     #---------------------------------------------------------------------------
+    n = 30
     H = lambda x: Hbp(np.cos(wstop1), np.cos(wpass1), \
                       np.cos(wpass2), np.cos(wstop2), x)
-
     iterations, d, hk = parksMcClellan(H, n)
     print("Filter coefficients: " + str(hk))
     print("Error: " + str(abs(d)))
     print("Iterations: " + str(abs(iterations)))
     w, h = signal.freqz(hk)
     fig = plt.figure()
-    plt.title('Digital filter frequency response')
+    plt.title('Band pass digital filter frequency response')
     ax1 = fig.add_subplot(111)
     plt.plot(w/np.pi, abs(h), 'b')
     plt.ylabel('Amplitude [mag]', color='b')
@@ -166,6 +202,7 @@ if __name__ == "__main__":
     #---------------------------------------------------------------------------
     # Low pass filter design
     #---------------------------------------------------------------------------
+    n = 30
     wpass2 = 0.8*np.pi
     wstop2 = 0.85*np.pi
     H = lambda x: Hlp(np.cos(wpass2), np.cos(wstop2), x)
@@ -176,7 +213,7 @@ if __name__ == "__main__":
     print("Iterations: " + str(abs(iterations)))
     w, h = signal.freqz(hk)
     fig = plt.figure()
-    plt.title('Digital filter frequency response')
+    plt.title('Low pass digital filter frequency response')
     ax1 = fig.add_subplot(111)
     plt.plot(w/np.pi, abs(h), 'b')
     plt.ylabel('Amplitude [mag]', color='b')
@@ -192,6 +229,7 @@ if __name__ == "__main__":
     #---------------------------------------------------------------------------
     # High pass filter design
     #---------------------------------------------------------------------------
+    n = 30
     wstop1 = 0.5*np.pi
     wpass1 = 0.6*np.pi
     H = lambda x: Hhp(np.cos(wstop1), np.cos(wpass1), x)
@@ -202,7 +240,31 @@ if __name__ == "__main__":
     print("Iterations: " + str(abs(iterations)))
     w, h = signal.freqz(hk)
     fig = plt.figure()
-    plt.title('Digital filter frequency response')
+    plt.title('High pass digital filter frequency response')
+    ax1 = fig.add_subplot(111)
+    plt.plot(w/np.pi, abs(h), 'b')
+    plt.ylabel('Amplitude [mag]', color='b')
+    plt.xlabel('Frequency ratio [rad/(sample*pi)]')
+    ax2 = ax1.twinx()
+    angles = np.unwrap(np.angle(h))
+    plt.plot(w/np.pi, angles/np.pi*180, 'g')
+    plt.ylabel('Angle (degree)', color='g')
+    plt.grid()
+    plt.axis('tight')
+    plt.show()
+
+    #---------------------------------------------------------------------------
+    # Fancy filter
+    #---------------------------------------------------------------------------
+    n = 40
+    H = lambda x: Hexp(x)
+    iterations, d, hk = parksMcClellan(H, n)
+    print("Filter coefficients: " + str(hk))
+    print("Error: " + str(abs(d)))
+    print("Iterations: " + str(abs(iterations)))
+    w, h = signal.freqz(hk)
+    fig = plt.figure()
+    plt.title('High pass digital filter frequency response')
     ax1 = fig.add_subplot(111)
     plt.plot(w/np.pi, abs(h), 'b')
     plt.ylabel('Amplitude [mag]', color='b')
