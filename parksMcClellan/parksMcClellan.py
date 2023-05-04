@@ -148,7 +148,8 @@ def parksMcClellan(H, n, maxiter = 100, eacc = 0.0001, wtol = 1e-6, ytol = 1e-5)
     iterations = 0
     while (old_d/d > (1 + eacc/100.0) or old_d/d < (1 - eacc/100.0)) and \
            iterations < maxiter:
-        extrema = findExtrema(lambda x: (H(x) - lagrange_int(x)), n, d, wtol, ytol)
+        extrema = findExtrema(lambda x: (H(x) - lagrange_int(x)), \
+                              n, d, wtol, ytol)
         old_d = d
         d = delta(extrema, H)    
         lagrange_int = lagrange(extrema[:-1], H(extrema[:-1]) + d*pm)
@@ -164,6 +165,28 @@ def parksMcClellan(H, n, maxiter = 100, eacc = 0.0001, wtol = 1e-6, ytol = 1e-5)
     hk = np.append(hk, tk[1:]/2.0)
     return iterations, d, hk
 
+
+#-------------------------------------------------------------------------------
+# Filter plot
+#-------------------------------------------------------------------------------
+def filterPlot(hk, H, title):
+    w, h = signal.freqz(hk)
+    fig = plt.figure()
+    plt.title(title)
+    ax1 = fig.add_subplot(111)
+    plt.plot(w/np.pi, abs(h), 'b')
+    plt.plot(w/np.pi, H(np.cos(w)), 'gray')
+    plt.ylabel('Amplitude [mag]', color='b')
+    plt.xlabel('Frequency ratio [rad/(sample*pi)]')
+    ax2 = ax1.twinx()
+    angles = np.unwrap(np.angle(h))
+    plt.plot(w/np.pi, angles/np.pi*180, 'g')
+    plt.ylabel('Angle (degree)', color='g')
+    plt.grid()
+    plt.axis('tight')
+    plt.show()
+
+    
 #-------------------------------------------------------------------------------
 ## Main
 #-------------------------------------------------------------------------------
@@ -183,20 +206,7 @@ if __name__ == "__main__":
     print("Filter coefficients: " + str(hk))
     print("Error: " + str(abs(d)))
     print("Iterations: " + str(abs(iterations)))
-    w, h = signal.freqz(hk)
-    fig = plt.figure()
-    plt.title('Band pass digital filter frequency response')
-    ax1 = fig.add_subplot(111)
-    plt.plot(w/np.pi, abs(h), 'b')
-    plt.ylabel('Amplitude [mag]', color='b')
-    plt.xlabel('Frequency ratio [rad/(sample*pi)]')
-    ax2 = ax1.twinx()
-    angles = np.unwrap(np.angle(h))
-    plt.plot(w/np.pi, angles/np.pi*180, 'g')
-    plt.ylabel('Angle (degree)', color='g')
-    plt.grid()
-    plt.axis('tight')
-    plt.show()
+    filterPlot(hk, H, "Band pass frequency response")
 
     #---------------------------------------------------------------------------
     # Low pass filter design
@@ -210,20 +220,7 @@ if __name__ == "__main__":
     print("Filter coefficients: " + str(hk))
     print("Error: " + str(abs(d)))
     print("Iterations: " + str(abs(iterations)))
-    w, h = signal.freqz(hk)
-    fig = plt.figure()
-    plt.title('Low pass digital filter frequency response')
-    ax1 = fig.add_subplot(111)
-    plt.plot(w/np.pi, abs(h), 'b')
-    plt.ylabel('Amplitude [mag]', color='b')
-    plt.xlabel('Frequency ratio [rad/(sample*pi)]')
-    ax2 = ax1.twinx()
-    angles = np.unwrap(np.angle(h))
-    plt.plot(w/np.pi, angles/np.pi*180, 'g')
-    plt.ylabel('Angle (degree)', color='g')
-    plt.grid()
-    plt.axis('tight')
-    plt.show()
+    filterPlot(hk, H, "Low  pass frequency response")
 
     #---------------------------------------------------------------------------
     # High pass filter design
@@ -237,20 +234,7 @@ if __name__ == "__main__":
     print("Filter coefficients: " + str(hk))
     print("Error: " + str(abs(d)))
     print("Iterations: " + str(abs(iterations)))
-    w, h = signal.freqz(hk)
-    fig = plt.figure()
-    plt.title('High pass digital filter frequency response')
-    ax1 = fig.add_subplot(111)
-    plt.plot(w/np.pi, abs(h), 'b')
-    plt.ylabel('Amplitude [mag]', color='b')
-    plt.xlabel('Frequency ratio [rad/(sample*pi)]')
-    ax2 = ax1.twinx()
-    angles = np.unwrap(np.angle(h))
-    plt.plot(w/np.pi, angles/np.pi*180, 'g')
-    plt.ylabel('Angle (degree)', color='g')
-    plt.grid()
-    plt.axis('tight')
-    plt.show()
+    filterPlot(hk, H, "High pass frequency response")
 
     #---------------------------------------------------------------------------
     # Fancy filter
@@ -261,17 +245,4 @@ if __name__ == "__main__":
     print("Filter coefficients: " + str(hk))
     print("Error: " + str(abs(d)))
     print("Iterations: " + str(abs(iterations)))
-    w, h = signal.freqz(hk)
-    fig = plt.figure()
-    plt.title('High pass digital filter frequency response')
-    ax1 = fig.add_subplot(111)
-    plt.plot(w/np.pi, abs(h), 'b')
-    plt.ylabel('Amplitude [mag]', color='b')
-    plt.xlabel('Frequency ratio [rad/(sample*pi)]')
-    ax2 = ax1.twinx()
-    angles = np.unwrap(np.angle(h))
-    plt.plot(w/np.pi, angles/np.pi*180, 'g')
-    plt.ylabel('Angle (degree)', color='g')
-    plt.grid()
-    plt.axis('tight')
-    plt.show()
+    filterPlot(hk, H, "Fancy filter  frequency response")
