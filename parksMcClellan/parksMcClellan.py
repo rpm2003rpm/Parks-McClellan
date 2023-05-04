@@ -92,42 +92,34 @@ def delta(extrema, H):
 #  @return array of extreme points
 #
 #-------------------------------------------------------------------------------
-def findExtrema(E, n, d, xtol = 1e-6, ytol = 1e-12):
-
-    #Experimentation based on derivative
-    #deriv = np.ediff1d(error)
-    #index = np.where(np.diff(np.sign(deriv)))[0]
-    #if deriv[0]*error[0] < 0:
-    #    index = np.insert(index, 0, 0)
-    #if deriv[-1]*error[-1] > 0:
-    #    index = np.append(index, len(error) - 1)
-    #y = np.absolute(error[index])
-    #i = np.flip(np.argsort(y))
-    #extrema = x[index[i[0:(n+2)]]]
-
-
-    #Based on maximum that exceeds abs(d)
-    x   = np.linspace(1, -1, num=int(2.0/xtol))
+def findExtrema(E, n, d, wtol = 1e-6, ytol = 1e-5):
+    x   = np.cos(np.linspace(0, np.pi, num = int(np.pi/wtol)))
     err = np.absolute(E(x))
-    ins = False
-    d   = abs(d)
+    k   = (err > ytol)
+    k   = np.insert(k, 0, False)
+    k   = np.append(k, False)
+    k   = np.diff(k)
+    up  = np.argwhere(k)[::2,0]
+    dwn = np.argwhere(k)[1::2,0]
     ind = np.array([], dtype = np.int64)
-    for i in range(0, len(x)):
-        if (err[i] - abs(d)*0.99) > ytol:
-            if (not ins) or ((err[i] - merr) > ytol):
-                imax = i
-                merr = err[i]
-                ins  = True
-        elif ins:
-            ind = np.append(ind, imax)
-            ins = False
-    if ins:
-        ind = np.append(ind, imax)
-
+    assert len(up) == len(dwn), "Something went wrong"
+    for j in range(0, len(up)):
+        jmax = np.argmax(err[up[j]:dwn[j]])
+        ind  = np.append(ind, jmax + up[j])
     i = np.flip(np.argsort(err[ind]))
     extrema = x[ind[i[0:(n+2)]]]
     extrema = np.flip(extrema[np.argsort(extrema)])
-    assert len(extrema) == n + 2, "Something went wrong"
+    if len(extrema) < n + 2:
+        plt.plot(np.arccos(x), 
+                 np.log10(err))
+        plt.plot(np.arccos(extrema), 
+                 np.log10(np.absolute(E(extrema))), 
+                 marker = "o")
+        plt.xlabel("cos(w)")
+        plt.ylabel("log10(abs(error))")
+        plt.title("Couldn't find all local min/max")
+        plt.show()
+        assert False, "Something went wrong"
     return extrema
 
 #-------------------------------------------------------------------------------
@@ -138,7 +130,7 @@ def findExtrema(E, n, d, xtol = 1e-6, ytol = 1e-12):
 #  @return error and filter coefficients
 #
 #-------------------------------------------------------------------------------
-def parksMcClellan(H, n, maxiter = 100, eacc = 0.0001):
+def parksMcClellan(H, n, maxiter = 100, eacc = 0.0001, wtol = 1e-6, ytol = 1e-5):
     assert n%2 == 0, "n must be even" 
     n = int(n/2)
     extrema = np.cos(np.linspace(0, np.pi, num=(n+2), dtype = np.float64))
@@ -149,7 +141,7 @@ def parksMcClellan(H, n, maxiter = 100, eacc = 0.0001):
     iterations = 0
     while (old_d/d > (1 + eacc/100.0) or old_d/d < (1 - eacc/100.0)) and \
            iterations < maxiter:
-        extrema = findExtrema(lambda x: (H(x) - lagrange_int(x)), n, d)
+        extrema = findExtrema(lambda x: (H(x) - lagrange_int(x)), n, d, wtol, ytol)
         old_d = d
         d = delta(extrema, H)    
         lagrange_int = lagrange(extrema[:-1], H(extrema[:-1]) + d*pm)
@@ -177,10 +169,10 @@ if __name__ == "__main__":
     #---------------------------------------------------------------------------
     # Band pass design
     #---------------------------------------------------------------------------
-    n = 30
+    n = 20
     H = lambda x: Hbp(np.cos(wstop1), np.cos(wpass1), \
                       np.cos(wpass2), np.cos(wstop2), x)
-    iterations, d, hk = parksMcClellan(H, n)
+    iterations, d, hk = parksMcClellan(H, n, ytol = 1e-4)
     print("Filter coefficients: " + str(hk))
     print("Error: " + str(abs(d)))
     print("Iterations: " + str(abs(iterations)))
@@ -202,7 +194,7 @@ if __name__ == "__main__":
     #---------------------------------------------------------------------------
     # Low pass filter design
     #---------------------------------------------------------------------------
-    n = 30
+    n = 50
     wpass2 = 0.8*np.pi
     wstop2 = 0.85*np.pi
     H = lambda x: Hlp(np.cos(wpass2), np.cos(wstop2), x)
