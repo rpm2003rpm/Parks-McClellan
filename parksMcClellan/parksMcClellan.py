@@ -83,51 +83,101 @@ def delta(extrema, H):
     return np.sum(gks*H(extrema))/np.sum(gks*pm)
         
 #-------------------------------------------------------------------------------
-## find the extreme points
+## Find the extremal points. More experimentation is needed. It doesn't seems 
+#  to work for filters of high order
 #  @param E pointer to error function
-#  @param n number of extreme points
+#  @param m number of extreme points
 #  @param d calculated error
 #  @param xtol x tolerance
 #  @param ytol y tolerance
 #  @return array of extreme points
 #
 #-------------------------------------------------------------------------------
-def findExtrema(E, n, d, wtol = 1e-6, ytol = 1e-5):
+def findExtrema(E, m, d, wtol = 1e-5, ytol = 1e-6, debug = True):
+    #Build an array of x points and calculate both the error and the differences
+    #Dont touch
     x   = np.cos(np.linspace(0, np.pi, num = int(np.pi/wtol)))
-    err = np.absolute(E(x))
-    k   = (err > ytol)
-    k   = np.insert(k, 0, False)
-    k   = np.append(k, False)
-    k   = np.diff(k)
-    up  = np.argwhere(k)[::2,0]
-    dwn = np.argwhere(k)[1::2,0]
-    ind = np.array([], dtype = np.int64)
-    assert len(up) == len(dwn), "Something went wrong"
-    for j in range(0, len(up)):
-        jmax = np.argmax(err[up[j]:dwn[j]])
-        ind  = np.append(ind, jmax + up[j])
-    i = np.flip(np.argsort(err[ind]))
-    extrema = x[ind[i[0:(n+2)]]]
-    extrema = np.flip(extrema[np.argsort(extrema)])
-    #errd    = np.insert(err, 0, 0)
-    #errd    = np.append(errd, 0)
-    #k       = np.diff(np.diff(errd) > 0)
-    #up      = np.argwhere(k)[0::2,0]
-    #i       = np.flip(np.argsort(err[up]))
-    #extrema = x[up[i[0:(n+2)]]]
-    #extrema = np.flip(extrema[np.argsort(extrema)])
-    if len(extrema) < n + 2:
-        plt.plot(np.arccos(x), 
-                 np.log10(err))
-        plt.plot(np.arccos(extrema), 
-                 np.log10(np.absolute(E(extrema))), 
-                 marker = "o")
+    err = E(x)
+    dif = np.diff(err)
+    
+    #Eliminate differences lower than the tolerance
+    maskth = np.absolute(dif) > ytol
+    ith    = np.argwhere(maskth)[:,0]
+    difth  = dif[maskth]
+    xth = x[ith]
+    eth = err[ith]
+
+    #Find the concavities and the edges
+    sgn = np.zeros_like(difth)
+    sgn[difth >= 0] = 1.0
+    con = np.diff(sgn) 
+    edg = np.argwhere(con != 0)[:,0]
+    con = con[edg]
+    ext = xth[edg]
+
+    #Decide if the upper and lower bounds need to be added
+    #Skip if upper bound is already an extremal point
+    if (ext < xth[1]).all():
+        if (eth[0] - eth[edg[0]])*con[0] > ytol:
+            edg = np.insert(edg, 0, 0)
+            con = np.insert(con, 0, -con[0])      
+    #Skip if lower bound is already an extremal point
+    if (ext > xth[-1]).all():
+        if (err[-1] - eth[edg[-1]])*con[-1] > ytol:
+            edg = np.append(edg, len(xth) - 1)
+            con = np.append(con, -con[-1])      
+    ext = xth[edg]
+
+    #If an even number of points can be removed, remove the lower diff 
+    #between min/max
+    rm = int((len(ext) - m)/2)
+    if rm > 0:
+        diffe = np.diff(eth[edg])
+        for i in range(0, rm):
+            irm = np.argsort(np.absolute(diffe))[0]
+            lrm = np.array([irm, irm + 1], dtype = np.int32)
+            if irm != (len(diffe) - 1) and irm != 0:
+                diffe[irm - 1] = diffe[irm - 1] + diffe[irm + 1]
+            if irm == (len(diffe) - 1):
+                diffe = np.delete(diffe, lrm - 1)
+            else:
+                diffe = np.delete(diffe, lrm)
+            edg   = np.delete(edg, lrm)
+            con   = np.delete(con, lrm)
+            ext   = np.delete(ext, lrm)
+
+    #If we still need to remove one point, remove one of the lower or
+    #upper bounds
+    if len(ext) > m:
+        if abs(eth[edg[0]] - eth[edg[1]]) > abs(eth[edg[-1]] - eth[edg[-2]]):
+            ext = ext[:-1]  
+            edg = edg[:-1]  
+            con = con[:-1]  
+        else:
+            ext = ext[1:]  
+            edg = edg[1:]  
+            con = con[1:]  
+            
+    #Double check alternation of concavities. Should hold by construction.
+    pm = np.array([(-1.0)**(i%2)  for i in range(0, len(con))])
+    assert (np.diff(pm*con) == 0).all(), "Ops.... " 
+
+    #Debug and error
+    if debug or len(ext) != m:
+        up  = edg[con > 0]
+        dwn = edg[con < 0] 
+        plt.plot(np.arccos(x), err)
+        plt.plot(np.arccos(xth[up]),  eth[up],  marker = "o")
+        plt.plot(np.arccos(xth[dwn]), eth[dwn],  marker = "o")
         plt.xlabel("cos(w)")
         plt.ylabel("log10(abs(error))")
-        plt.title("Couldn't find all local min/max")
+        if len(ext) == m:    
+            plt.title("Debug mode. Extremal points found.")
+        else:
+            plt.title("Couldn't find all the necessary extremal points")
         plt.show()
-        assert False, "Something went wrong"
-    return extrema
+    assert len(ext) == m, "Something went wrong"
+    return ext
 
 #-------------------------------------------------------------------------------
 ## parksMcClellan algorithm
@@ -137,7 +187,9 @@ def findExtrema(E, n, d, wtol = 1e-6, ytol = 1e-5):
 #  @return error and filter coefficients
 #
 #-------------------------------------------------------------------------------
-def parksMcClellan(H, n, maxiter = 100, eacc = 0.0001, wtol = 1e-6, ytol = 1e-5):
+def parksMcClellan(H, n, maxiter = 100, \
+                   eacc = 0.0001, wtol = 1e-5, ytol = 1e-7,
+                   debug = True):
     assert n%2 == 0, "n must be even" 
     n = int(n/2)
     extrema = np.cos(np.linspace(0, np.pi, num=(n+2), dtype = np.float64))
@@ -149,16 +201,11 @@ def parksMcClellan(H, n, maxiter = 100, eacc = 0.0001, wtol = 1e-6, ytol = 1e-5)
     while (old_d/d > (1 + eacc/100.0) or old_d/d < (1 - eacc/100.0)) and \
            iterations < maxiter:
         extrema = findExtrema(lambda x: (H(x) - lagrange_int(x)), \
-                              n, d, wtol, ytol)
+                              n + 2, d, wtol, ytol, debug)
         old_d = d
         d = delta(extrema, H)    
         lagrange_int = lagrange(extrema[:-1], H(extrema[:-1]) + d*pm)
         iterations = iterations + 1
-    x = np.linspace(1, -1, num=10000)
-    plt.plot(x, H(x)-lagrange_int(x))
-    plt.xlabel('Cos(w)')
-    plt.ylabel('Error')
-    plt.show()
     bk = Polynomial(lagrange_int.coef[::-1]).coef   
     tk = np.polynomial.chebyshev.poly2cheb(bk)
     hk = np.append(np.flip(tk[1:]/2.0), tk[0])
@@ -186,7 +233,6 @@ def filterPlot(hk, H, title):
     plt.axis('tight')
     plt.show()
 
-    
 #-------------------------------------------------------------------------------
 ## Main
 #-------------------------------------------------------------------------------
@@ -199,10 +245,10 @@ if __name__ == "__main__":
     #---------------------------------------------------------------------------
     # Band pass design
     #---------------------------------------------------------------------------
-    n = 40
+    n = 30
     H = lambda x: Hbp(np.cos(wstop1), np.cos(wpass1), \
                       np.cos(wpass2), np.cos(wstop2), x)
-    iterations, d, hk = parksMcClellan(H, n, ytol = 1e-4)
+    iterations, d, hk = parksMcClellan(H, n, debug = False)
     print("Filter coefficients: " + str(hk))
     print("Error: " + str(abs(d)))
     print("Iterations: " + str(abs(iterations)))
@@ -215,8 +261,7 @@ if __name__ == "__main__":
     wpass2 = 0.8*np.pi
     wstop2 = 0.85*np.pi
     H = lambda x: Hlp(np.cos(wpass2), np.cos(wstop2), x)
-
-    iterations, d, hk = parksMcClellan(H, n)
+    iterations, d, hk = parksMcClellan(H, n, debug = False)
     print("Filter coefficients: " + str(hk))
     print("Error: " + str(abs(d)))
     print("Iterations: " + str(abs(iterations)))
@@ -225,12 +270,12 @@ if __name__ == "__main__":
     #---------------------------------------------------------------------------
     # High pass filter design
     #---------------------------------------------------------------------------
-    n = 30
+    n = 10
     wstop1 = 0.5*np.pi
     wpass1 = 0.6*np.pi
     H = lambda x: Hhp(np.cos(wstop1), np.cos(wpass1), x)
 
-    iterations, d, hk = parksMcClellan(H, n)
+    iterations, d, hk = parksMcClellan(H, n, debug = False)
     print("Filter coefficients: " + str(hk))
     print("Error: " + str(abs(d)))
     print("Iterations: " + str(abs(iterations)))
@@ -241,7 +286,7 @@ if __name__ == "__main__":
     #---------------------------------------------------------------------------
     n = 40
     H = lambda x: Hexp(x)
-    iterations, d, hk = parksMcClellan(H, n)
+    iterations, d, hk = parksMcClellan(H, n, debug = False)
     print("Filter coefficients: " + str(hk))
     print("Error: " + str(abs(d)))
     print("Iterations: " + str(abs(iterations)))
