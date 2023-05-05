@@ -93,7 +93,7 @@ def delta(extrema, H):
 #  @return array of extreme points
 #
 #-------------------------------------------------------------------------------
-def findExtrema(E, m, d, wtol = 1e-5, ytol = 1e-6, debug = True):
+def findExtrema(E, m, d, wtol = 1e-5, ytol = 1e-7, debug = True):
     #Build an array of x points and calculate both the error and the differences
     #Dont touch
     x   = np.cos(np.linspace(0, np.pi, num = int(np.pi/wtol)))
@@ -188,7 +188,7 @@ def findExtrema(E, m, d, wtol = 1e-5, ytol = 1e-6, debug = True):
 #
 #-------------------------------------------------------------------------------
 def parksMcClellan(H, n, maxiter = 100, \
-                   eacc = 0.0001, wtol = 1e-5, ytol = 1e-7,
+                   eacc = 0.0001, wtol = 1e-4, ytol = 1e-8,
                    debug = True):
     assert n%2 == 0, "n must be even" 
     n = int(n/2)
@@ -245,7 +245,7 @@ if __name__ == "__main__":
     #---------------------------------------------------------------------------
     # Band pass design
     #---------------------------------------------------------------------------
-    n = 30
+    n = 40
     H = lambda x: Hbp(np.cos(wstop1), np.cos(wpass1), \
                       np.cos(wpass2), np.cos(wstop2), x)
     iterations, d, hk = parksMcClellan(H, n, debug = False)
