@@ -167,8 +167,8 @@ def findExtrema(E, m, d, wtol = 1e-5, ytol = 1e-7, debug = True):
         up  = edg[con > 0]
         dwn = edg[con < 0] 
         plt.plot(np.arccos(x), err)
-        plt.plot(np.arccos(xth[up]),  eth[up],  marker = "o")
-        plt.plot(np.arccos(xth[dwn]), eth[dwn],  marker = "o")
+        plt.scatter(np.arccos(xth[up]),  eth[up])
+        plt.scatter(np.arccos(xth[dwn]), eth[dwn])
         plt.xlabel("cos(w)")
         plt.ylabel("log10(abs(error))")
         if len(ext) == m:    
@@ -192,7 +192,7 @@ def parksMcClellan(H, n, maxiter = 100, \
                    debug = True):
     assert n%2 == 0, "n must be even" 
     n = int(n/2)
-    extrema = np.cos(np.linspace(0, np.pi, num=(n+2), dtype = np.float64))
+    extrema = np.cos(np.linspace(0, np.pi, num=(n+4), dtype = np.float64)[1:-1])
     pm = np.array([(-1.0)**(i%2)  for i in range(1, len(extrema))])
     d = delta(extrema, H)    
     old_d = 1000
@@ -245,7 +245,7 @@ if __name__ == "__main__":
     #---------------------------------------------------------------------------
     # Band pass design
     #---------------------------------------------------------------------------
-    n = 40
+    n = 18
     H = lambda x: Hbp(np.cos(wstop1), np.cos(wpass1), \
                       np.cos(wpass2), np.cos(wstop2), x)
     iterations, d, hk = parksMcClellan(H, n, debug = False)
@@ -270,7 +270,7 @@ if __name__ == "__main__":
     #---------------------------------------------------------------------------
     # High pass filter design
     #---------------------------------------------------------------------------
-    n = 10
+    n = 26
     wstop1 = 0.5*np.pi
     wpass1 = 0.6*np.pi
     H = lambda x: Hhp(np.cos(wstop1), np.cos(wpass1), x)
