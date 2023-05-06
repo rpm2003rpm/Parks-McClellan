@@ -47,11 +47,11 @@ def Wconst(x):
     return np.ones_like(x)   
 
 #-------------------------------------------------------------------------------
-## Transfer function of a low pass filter
+## Weight function of a low pass filter
 #  @param xpass pass frequency as a function of cos(wpass)
 #  @param xstop stop frequency as a function of cos(stop)
 #  @param x input vector
-#  @return np array representing the TF
+#  @return np array representing the weight
 #
 #-------------------------------------------------------------------------------
 def Wlp(xpass, xstop, x):
@@ -67,7 +67,14 @@ def Wlp(xpass, xstop, x):
     y[mask] = 0.1
     return y
     
-    
+#-------------------------------------------------------------------------------
+## Transfer function of a low pass filter
+#  @param xpass pass frequency as a function of cos(wpass)
+#  @param xstop stop frequency as a function of cos(stop)
+#  @param x input vector
+#  @return np array representing the TF
+#
+#-------------------------------------------------------------------------------
 def Hlp(xpass, xstop, x):
     assert xstop >= -1 or xstop <= 1, "xstop is out of range"
     assert xpass >= -1 or xpass <= 1, "xpass is out of range"
@@ -272,38 +279,43 @@ def findExtrema(E, m, d, wtol = 1e-5, ytol = 1e-7, debug = True):
 #  @param xtol x tolerance
 #  @param ytol y tolerance
 #  @param debug enable or disable the debug mode
+#  @param iniExt inital extremal points. It will be linear if equal to noe
 #  @return error and filter coefficients
 #
 #-------------------------------------------------------------------------------
 def parksMcClellan(H, W, n, maxiter = 100, \
                    eacc = 0.0001, wtol = 1e-4, ytol = 1e-8,
                    debug = True,
-                   firstExtChoice = "linear"):
+                   iniExt = None):
+    assert callable(H), "H must be callable"
+    assert callable(W), "W must be callable"
+    assert isinstance(n, int), "filter order must be integer" 
+    assert isinstance(maxiter, int), "maximum iteration must be integer" 
+    assert isinstance(eacc, float), "eacc must be float" 
+    assert isinstance(ytol, float), "ytol must be float" 
+    assert isinstance(wtol, float), "wtol must be float" 
+    assert isinstance(debug, bool), "debug must be bool"
     assert n%2 == 0, "n must be even" 
-    n  = int(n/2)
-    if firstExtChoice == "random":
-        x  = np.cos(np.linspace(0, np.pi, num = int(np.pi/wtol)))
-        weight = W(x)
-        extremal = np.random.choice(x, n + 2, p = weight/np.sum(weight))
-    elif firstExtChoice == "linear":
-        extremal = np.cos(np.linspace(0, np.pi, num = (n + 4)))[1:-1] 
+    m = int(n/2)
+    if iniExt == None:
+        extremal = np.cos(np.linspace(0, np.pi, num = (m + 4)))[1:-1] 
     else:
-        raise Exception("You must select a valid way to choose the inital" +\
-                        " extremal points")
+        extremal = iniExt
+        assert isinstance(iniExt, np.ndarray), "iniExt must be an ndarray" 
     pm = np.array([(-1.0)**(i%2)  for i in range(1, len(extremal))])
     d = delta(extremal, H, W)    
     old_d = 1000
     lagrange_int = lagrange(extremal[:-1], \
-                   H(extremal[:-1]) + pm*d/W(extremal[:-1]))
+                            H(extremal[:-1]) + pm*d/W(extremal[:-1]))
     iterations = 0
     while (old_d/d > (1 + eacc/100.0) or old_d/d < (1 - eacc/100.0)) and \
            iterations < maxiter:
         extremal = findExtrema(lambda x: (H(x) - lagrange_int(x))*W(x), \
-                              n + 2, d, wtol, ytol, debug)
+                               m + 2, d, wtol, ytol, debug)
         old_d = d
         d = delta(extremal, H, W)    
         lagrange_int = lagrange(extremal[:-1], \
-                       H(extremal[:-1]) + pm*d/W(extremal[:-1]))
+                                H(extremal[:-1]) + pm*d/W(extremal[:-1]))
         iterations = iterations + 1
     bk = Polynomial(lagrange_int.coef[::-1]).coef   
     tk = np.polynomial.chebyshev.poly2cheb(bk)
@@ -320,6 +332,9 @@ def parksMcClellan(H, W, n, maxiter = 100, \
 #
 #-------------------------------------------------------------------------------
 def filterPlot(hk, H, title):
+    assert isinstance(hk, np.ndarray), "hk must be an ndarray" 
+    assert callable(H), "H must be callable"
+    assert isinstance(title, str), "title must be a string" 
     w, h = signal.freqz(hk)
     fig = plt.figure()
     plt.title(title)
