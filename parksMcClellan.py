@@ -61,9 +61,6 @@ def Wlp(xpass, xstop, x):
     assert ((x >= -1) | (x <= 1)).all(), "x is out of range"
     y= np.ones_like(x)
     mask = (x < xpass) & (x > xstop)
-    #avg = (np.arccos(xpass) + np.arccos(xstop))/2.0
-    #y[mask] = 0.02 + 0.98*np.absolute((np.arccos(x[mask]) - avg)/ \
-    #                                  (np.arccos(xpass)   - avg))
     y[mask] = 0.002
     return y
     
@@ -385,8 +382,10 @@ if __name__ == "__main__":
 
     #---------------------------------------------------------------------------
     # Low pass filter design. Result similar to matlab
+    # Change the weight function for higher order filter so no extremal
+    # is located in the transition
     #---------------------------------------------------------------------------
-    n = 8
+    n = 14
     wpass2 = 0.3*np.pi
     wstop2 = 0.8*np.pi
     H = lambda x: Hlp(np.cos(wpass2), np.cos(wstop2), x)
