@@ -64,7 +64,7 @@ def Wlp(xpass, xstop, x):
     #avg = (np.arccos(xpass) + np.arccos(xstop))/2.0
     #y[mask] = 0.02 + 0.98*np.absolute((np.arccos(x[mask]) - avg)/ \
     #                                  (np.arccos(xpass)   - avg))
-    y[mask] = 0.1
+    y[mask] = 0.002
     return y
     
 #-------------------------------------------------------------------------------
@@ -159,16 +159,14 @@ def delta(extremal, H, W):
 #  @param m number of extreme points
 #  @param d calculated error
 #  @param xtol x tolerance
-#  @param ytol y tolerance
 #  @param debug enable or disable the debug mode
 #  @return array of extremal points
 #
 #-------------------------------------------------------------------------------
-def findExtremal(E, m, d, wtol = 1e-5, ytol = 1e-7, debug = True):
+def findExtremal(E, m, d, wtol = 1e-5, debug = True):
     assert callable(E), "E must be callable"
     assert isinstance(m, int), "number of extreme points must be integer" 
     assert isinstance(d, float), "delta must be float" 
-    assert isinstance(ytol, float), "ytol must be float" 
     assert isinstance(wtol, float), "wtol must be float" 
     assert isinstance(debug, bool), "debug must be bool"
     #Build an array of x points and calculate both the error and the differences
@@ -176,43 +174,36 @@ def findExtremal(E, m, d, wtol = 1e-5, ytol = 1e-7, debug = True):
     x   = np.cos(np.linspace(0, np.pi, num = int(np.pi/wtol)))
     err = E(x)
     dif = np.diff(err)
-    
-    #Eliminate differences lower than the tolerance
-    maskth = np.absolute(dif) > ytol
-    ith    = np.argwhere(maskth)[:,0]
-    difth  = dif[maskth]
-    xth = x[ith]
-    eth = err[ith]
+    x   = x[1:]
+    err = err[1:]
 
     #Find the concavities and the edges
-    sgn = np.zeros_like(difth)
-    sgn[difth >= 0] = 1.0
+    sgn = np.zeros_like(dif)
+    sgn[dif >= 0] = 1.0
     con = np.diff(sgn) 
     edg = np.argwhere(con != 0)[:,0]
     con = con[edg]
-    ext = xth[edg]
+    ext = x[edg]
 
     #Decide if the upper and lower bounds need to be added
-    #Skip if upper bound is already an extremall point
-    if (ext < xth[1]).all():
-        if (eth[0] - eth[edg[0]])*con[0] > ytol:
-            edg = np.insert(edg, 0, 0)
-            con = np.insert(con, 0, -con[0])      
-    #Skip if lower bound is already an extremall point
-    if (ext > xth[-1]).all():
-        if (err[-1] - eth[edg[-1]])*con[-1] > ytol:
-            edg = np.append(edg, len(xth) - 1)
-            con = np.append(con, -con[-1])      
-    ext = xth[edg]
+    #Skip if upper bound is already an extremal point
+    if (ext < x[1]).all():
+        edg = np.insert(edg, 0, 0)
+        con = np.insert(con, 0, -con[0])      
+    #Skip if lower bound is already an extremal point
+    if (ext > x[-1]).all():
+        edg = np.append(edg, len(x) - 1)
+        con = np.append(con, -con[-1])      
+    ext = x[edg]
 
     #Debug and error
     if debug:
         up  = edg[con > 0]
         dwn = edg[con < 0] 
         plt.plot(np.arccos(x), err)
-        plt.scatter(np.arccos(xth[up]),  eth[up])
-        plt.scatter(np.arccos(xth[dwn]), eth[dwn])
-        plt.xlabel("cos(w)")
+        plt.scatter(np.arccos(x[up]),  err[up])
+        plt.scatter(np.arccos(x[dwn]), err[dwn])
+        plt.xlabel("w(rad/s)")
         plt.ylabel("log10(abs(Weighted error))")
         plt.title("Candidate to extremal points.")
         plt.show()
@@ -221,7 +212,7 @@ def findExtremal(E, m, d, wtol = 1e-5, ytol = 1e-7, debug = True):
     #between min/max
     rm = int((len(ext) - m)/2)
     if rm > 0:
-        diffe = np.diff(eth[edg])
+        diffe = np.diff(err[edg])
         for i in range(0, rm):
             irm = np.argsort(np.absolute(diffe))[0]
             lrm = np.array([irm, irm + 1], dtype = np.int32)
@@ -238,7 +229,7 @@ def findExtremal(E, m, d, wtol = 1e-5, ytol = 1e-7, debug = True):
     #If we still need to remove one point, remove one of the lower or
     #upper bounds
     if len(ext) > m:
-        if abs(eth[edg[0]] - eth[edg[1]]) > abs(eth[edg[-1]] - eth[edg[-2]]):
+        if abs(err[edg[0]] - err[edg[1]]) > abs(err[edg[-1]] - err[edg[-2]]):
             ext = ext[:-1]  
             edg = edg[:-1]  
             con = con[:-1]  
@@ -256,17 +247,59 @@ def findExtremal(E, m, d, wtol = 1e-5, ytol = 1e-7, debug = True):
         up  = edg[con > 0]
         dwn = edg[con < 0] 
         plt.plot(np.arccos(x), err)
-        plt.scatter(np.arccos(xth[up]),  eth[up])
-        plt.scatter(np.arccos(xth[dwn]), eth[dwn])
-        plt.xlabel("cos(w)")
+        plt.scatter(np.arccos(x[up]),  err[up])
+        plt.scatter(np.arccos(x[dwn]), err[dwn])
+        plt.xlabel("w(rad/s)")
         plt.ylabel("log10(abs(Weighted error))")
         if len(ext) == m:    
-            plt.title("Debug mode. Extremall points found.")
+            plt.title("Debug mode. Extremal points found.")
         else:
-            plt.title("Couldn't find all the necessary extremall points")
+            plt.title("Couldn't find all the necessary extremal points")
         plt.show()
-    assert len(ext) == m, "Something went wrong"
+    assert len(ext) == m, "Somerring went wrong"
     return ext
+
+#-------------------------------------------------------------------------------
+## remex algorithm
+#  @param F function to be aproximated
+#  @param W weight function 
+#  @param m order of the polynomial
+#  @param extremal inital extremal points
+#  @param maxiter maximum numbe of iterations
+#  @param eacc the algorithm will stop when the error changes between
+#         iterations is less than eacc%
+#  @param wtol x tolerance
+#  @param debug enable or disable the debug mode
+#  @return error, extremal, polynomial coefficients
+#
+#-------------------------------------------------------------------------------
+def remez(F, W, m, extremal, maxiter = 100, \
+                             eacc = 0.0001, wtol = 1e-4,
+                             debug = True):
+    assert callable(F), "F must be callable"
+    assert callable(W), "W must be callable"
+    assert isinstance(m, int), "polynomial order must be integer" 
+    assert isinstance(extremal, np.ndarray), "extremal must be a ndarray" 
+    assert isinstance(maxiter, int), "maximum iteration must be integer" 
+    assert isinstance(eacc, float), "eacc must be float" 
+    assert isinstance(wtol, float), "wtol must be float" 
+    assert isinstance(debug, bool), "debug must be bool"
+    pm = np.array([(-1.0)**(i%2)  for i in range(1, len(extremal))])
+    d = delta(extremal, H, W)    
+    old_d = 1000
+    lagrange_int = lagrange(extremal[:-1], \
+                            H(extremal[:-1]) + pm*d/W(extremal[:-1]))
+    iterations = 0
+    while (old_d/d > (1 + eacc/100.0) or old_d/d < (1 - eacc/100.0)) and \
+           iterations < maxiter:
+        extremal = findExtremal(lambda x: (H(x) - lagrange_int(x))*W(x), \
+                                m + 2, d, wtol, debug)
+        old_d = d
+        d = delta(extremal, H, W)    
+        lagrange_int = lagrange(extremal[:-1], \
+                                H(extremal[:-1]) + pm*d/W(extremal[:-1]))
+        iterations = iterations + 1
+    return extremal, iterations, d, lagrange_int
 
 #-------------------------------------------------------------------------------
 ## parksMcClellan algorithm
@@ -277,47 +310,25 @@ def findExtremal(E, m, d, wtol = 1e-5, ytol = 1e-7, debug = True):
 #  @param eacc the algorithm will stop when the error changes between
 #         iterations is less than eacc%
 #  @param xtol x tolerance
-#  @param ytol y tolerance
 #  @param debug enable or disable the debug mode
-#  @param iniExt inital extremal points. It will be linear if equal to noe
 #  @return error and filter coefficients
 #
 #-------------------------------------------------------------------------------
 def parksMcClellan(H, W, n, maxiter = 100, \
-                   eacc = 0.0001, wtol = 1e-4, ytol = 1e-8,
-                   debug = True,
-                   iniExt = None):
+                   eacc = 0.0001, wtol = 1e-4,
+                   debug = True):
     assert callable(H), "H must be callable"
     assert callable(W), "W must be callable"
     assert isinstance(n, int), "filter order must be integer" 
     assert isinstance(maxiter, int), "maximum iteration must be integer" 
     assert isinstance(eacc, float), "eacc must be float" 
-    assert isinstance(ytol, float), "ytol must be float" 
     assert isinstance(wtol, float), "wtol must be float" 
     assert isinstance(debug, bool), "debug must be bool"
     assert n%2 == 0, "n must be even" 
     m = int(n/2)
-    if iniExt == None:
-        extremal = np.cos(np.linspace(0, np.pi, num = (m + 4)))[1:-1] 
-    else:
-        extremal = iniExt
-        assert isinstance(iniExt, np.ndarray), "iniExt must be an ndarray" 
-    pm = np.array([(-1.0)**(i%2)  for i in range(1, len(extremal))])
-    d = delta(extremal, H, W)    
-    old_d = 1000
-    lagrange_int = lagrange(extremal[:-1], \
-                            H(extremal[:-1]) + pm*d/W(extremal[:-1]))
-    iterations = 0
-    while (old_d/d > (1 + eacc/100.0) or old_d/d < (1 - eacc/100.0)) and \
-           iterations < maxiter:
-        extremal = findExtremal(lambda x: (H(x) - lagrange_int(x))*W(x), \
-                               m + 2, d, wtol, ytol, debug)
-        old_d = d
-        d = delta(extremal, H, W)    
-        lagrange_int = lagrange(extremal[:-1], \
-                                H(extremal[:-1]) + pm*d/W(extremal[:-1]))
-        iterations = iterations + 1
-    bk = Polynomial(lagrange_int.coef[::-1]).coef   
+    ext = np.cos(np.linspace(0, np.pi, num = (m + 4)))[1:-1] 
+    ext, iterations, d, lgr = remez(H, W, m, ext, maxiter, eacc, wtol, debug)
+    bk = Polynomial(lgr.coef[::-1]).coef   
     tk = np.polynomial.chebyshev.poly2cheb(bk)
     hk = np.append(np.flip(tk[1:]/2.0), tk[0])
     hk = np.append(hk, tk[1:]/2.0)
@@ -363,7 +374,7 @@ if __name__ == "__main__":
     #---------------------------------------------------------------------------
     # Band pass design
     #---------------------------------------------------------------------------
-    n = 18
+    n = 40
     H = lambda x: Hbp(np.cos(wstop1), np.cos(wpass1), \
                       np.cos(wpass2), np.cos(wstop2), x)
     iterations, d, hk = parksMcClellan(H, Wconst, n, debug = False)
@@ -373,14 +384,15 @@ if __name__ == "__main__":
     filterPlot(hk, H, "Band pass frequency response")
 
     #---------------------------------------------------------------------------
-    # Low pass filter design
+    # Low pass filter design. Result similar to matlab
     #---------------------------------------------------------------------------
     n = 8
     wpass2 = 0.3*np.pi
     wstop2 = 0.8*np.pi
     H = lambda x: Hlp(np.cos(wpass2), np.cos(wstop2), x)
     W = lambda x: Wlp(np.cos(wpass2), np.cos(wstop2), x)
-    iterations, d, hk = parksMcClellan(H, W, n, debug = False)
+    iterations, d, hk = parksMcClellan(H, W, n, \
+                                       wtol = 1e-6, debug = False)
     print("Filter coefficients: " + str(hk))
     print("Error: " + str(abs(d)))
     print("Iterations: " + str(abs(iterations)))
