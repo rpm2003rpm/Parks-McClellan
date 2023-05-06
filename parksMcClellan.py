@@ -36,11 +36,42 @@ from numpy.polynomial.polynomial import Polynomial
 from scipy import signal
 
 #-------------------------------------------------------------------------------
-## TF of low pass filter
+## Constant weight function
+#  @param x input vector
+#  @return output of the same size as the input vector fill-up with ones
+#
 #-------------------------------------------------------------------------------
+def Wconst(x):
+    assert isinstance(x, np.ndarray), "x must be a numpy array" 
+    assert ((x >= -1) | (x <= 1)).all(), "x is out of range"
+    return np.ones_like(x)   
+
+#-------------------------------------------------------------------------------
+## Transfer function of a low pass filter
+#  @param xpass pass frequency as a function of cos(wpass)
+#  @param xstop stop frequency as a function of cos(stop)
+#  @param x input vector
+#  @return np array representing the TF
+#
+#-------------------------------------------------------------------------------
+def Wlp(xpass, xstop, x):
+    assert xstop >= -1 or xstop <= 1, "xstop is out of range"
+    assert xpass >= -1 or xpass <= 1, "xpass is out of range"
+    assert isinstance(x, np.ndarray), "x must be a numpy array" 
+    assert ((x >= -1) | (x <= 1)).all(), "x is out of range"
+    y= np.ones_like(x)
+    mask = (x < xpass) & (x > xstop)
+    #avg = (np.arccos(xpass) + np.arccos(xstop))/2.0
+    #y[mask] = 0.02 + 0.98*np.absolute((np.arccos(x[mask]) - avg)/ \
+    #                                  (np.arccos(xpass)   - avg))
+    y[mask] = 0.1
+    return y
+    
+    
 def Hlp(xpass, xstop, x):
-    assert xstop >= -1 or xstop <= 1,    "xstop is out of range"
-    assert xpass >= -1 or xpass <= 1,    "xpass is out of range"
+    assert xstop >= -1 or xstop <= 1, "xstop is out of range"
+    assert xpass >= -1 or xpass <= 1, "xpass is out of range"
+    assert isinstance(x, np.ndarray), "x must be a numpy array" 
     assert ((x >= -1) | (x <= 1)).all(), "x is out of range"
     y= np.zeros_like(x)
     y[x >= xpass] = 1.0
@@ -50,50 +81,89 @@ def Hlp(xpass, xstop, x):
     return y
 
 #-------------------------------------------------------------------------------
-## TF of high pass filter
+## Transfer function of a high pass filter
+#  @param xstop stop frequency as a function of cos(stop)
+#  @param xpass pass frequency as a function of cos(wpass)
+#  @param x input vector
+#  @return np array representing the TF
+#
 #-------------------------------------------------------------------------------
 def Hhp(xstop, xpass, x):
     return 1.0 - Hlp(xstop, xpass, x)
 
 #-------------------------------------------------------------------------------
-## TF of a band pass filter
+## Transfer function of a band pass filter
+#  @param xstop1 1st stop frequency as a function of cos(stop1)
+#  @param xpass1 1st pass frequency as a function of cos(wpass1)
+#  @param xpass2 2st pass frequency as a function of cos(wpass2)
+#  @param xstop2 2st stop frequency as a function of cos(stop2)
+#  @param x input vector
+#  @return np array representing the TF
+#
 #-------------------------------------------------------------------------------
 def Hbp(xstop1, xpass1, xpass2, xstop2, x):
     return Hlp(xpass2, xstop2, x)*Hhp(xstop1, xpass1, x)
 
 #-------------------------------------------------------------------------------
-## TF of a fancy filter
+## TF of a filter for teesting
+#  @param x input vector
+#  @return np array representing the TF
+#
 #-------------------------------------------------------------------------------
 def Hexp(x):
+    assert isinstance(x, np.ndarray), "x must be a numpy array" 
+    assert ((x >= -1) | (x <= 1)).all(), "x is out of range"
     return np.exp(-2*np.arccos(x)/np.pi)
 
 #-------------------------------------------------------------------------------
 ## Gamma
+#  @param k idex
+#  @param extremal frequencies
+#  @return gamma k
+#
 #-------------------------------------------------------------------------------
-def gk(k, extrema):
-    return 1.0/(np.prod(extrema[k] - extrema[0:k])*\
-                np.prod(extrema[k] - extrema[(k+1):len(extrema)]))
+def gk(k, extremal):
+    assert isinstance(extremal, np.ndarray), "extremal must be a numpy array" 
+    assert isinstance(k, int), "k must be int" 
+    assert k >= 0 and k < len(extremal), "k is outside limits" 
+    return 1.0/(np.prod(extremal[k] - extremal[0:k])*\
+                np.prod(extremal[k] - extremal[(k+1):len(extremal)]))
     
 #-------------------------------------------------------------------------------
 ## Delta 
+#  @param extremal frequencies
+#  @param H transfer function 
+#  @param W weight function 
+#  @return real number representing the delta
+#
 #-------------------------------------------------------------------------------
-def delta(extrema, H):
-    gks = np.array([gk(k, extrema) for k in range(0, len(extrema))])
-    pm  = np.array([(-1.0)**(i%2)  for i in range(0, len(extrema))])
-    return np.sum(gks*H(extrema))/np.sum(gks*pm)
+def delta(extremal, H, W):
+    assert isinstance(extremal, np.ndarray), "extremal must be a numpy array" 
+    assert callable(H), "H must be callable"
+    assert callable(W), "W must be callable"
+    gks = np.array([gk(k, extremal) for k in range(0, len(extremal))])
+    pm  = np.array([(-1.0)**(i%2)  for i in range(0, len(extremal))])
+    return np.sum(gks*H(extremal))/np.sum(gks/W(extremal)*pm)
         
 #-------------------------------------------------------------------------------
 ## Find the extremal points. More experimentation is needed. It doesn't seems 
 #  to work for filters of high order
-#  @param E pointer to error function
+#  @param E pointer to error weighted function
 #  @param m number of extreme points
 #  @param d calculated error
 #  @param xtol x tolerance
 #  @param ytol y tolerance
-#  @return array of extreme points
+#  @param debug enable or disable the debug mode
+#  @return array of extremal points
 #
 #-------------------------------------------------------------------------------
 def findExtrema(E, m, d, wtol = 1e-5, ytol = 1e-7, debug = True):
+    assert callable(E), "E must be callable"
+    assert isinstance(m, int), "number of extreme points must be integer" 
+    assert isinstance(d, float), "delta must be float" 
+    assert isinstance(ytol, float), "ytol must be float" 
+    assert isinstance(wtol, float), "wtol must be float" 
+    assert isinstance(debug, bool), "debug must be bool"
     #Build an array of x points and calculate both the error and the differences
     #Dont touch
     x   = np.cos(np.linspace(0, np.pi, num = int(np.pi/wtol)))
@@ -116,17 +186,29 @@ def findExtrema(E, m, d, wtol = 1e-5, ytol = 1e-7, debug = True):
     ext = xth[edg]
 
     #Decide if the upper and lower bounds need to be added
-    #Skip if upper bound is already an extremal point
+    #Skip if upper bound is already an extremall point
     if (ext < xth[1]).all():
         if (eth[0] - eth[edg[0]])*con[0] > ytol:
             edg = np.insert(edg, 0, 0)
             con = np.insert(con, 0, -con[0])      
-    #Skip if lower bound is already an extremal point
+    #Skip if lower bound is already an extremall point
     if (ext > xth[-1]).all():
         if (err[-1] - eth[edg[-1]])*con[-1] > ytol:
             edg = np.append(edg, len(xth) - 1)
             con = np.append(con, -con[-1])      
     ext = xth[edg]
+
+    #Debug and error
+    if debug:
+        up  = edg[con > 0]
+        dwn = edg[con < 0] 
+        plt.plot(np.arccos(x), err)
+        plt.scatter(np.arccos(xth[up]),  eth[up])
+        plt.scatter(np.arccos(xth[dwn]), eth[dwn])
+        plt.xlabel("cos(w)")
+        plt.ylabel("log10(abs(Weighted error))")
+        plt.title("Candidate to extremal points.")
+        plt.show()
 
     #If an even number of points can be removed, remove the lower diff 
     #between min/max
@@ -170,41 +252,58 @@ def findExtrema(E, m, d, wtol = 1e-5, ytol = 1e-7, debug = True):
         plt.scatter(np.arccos(xth[up]),  eth[up])
         plt.scatter(np.arccos(xth[dwn]), eth[dwn])
         plt.xlabel("cos(w)")
-        plt.ylabel("log10(abs(error))")
+        plt.ylabel("log10(abs(Weighted error))")
         if len(ext) == m:    
             plt.title("Debug mode. Extremal points found.")
         else:
-            plt.title("Couldn't find all the necessary extremal points")
+            plt.title("Couldn't find all the necessary extremall points")
         plt.show()
     assert len(ext) == m, "Something went wrong"
     return ext
 
 #-------------------------------------------------------------------------------
 ## parksMcClellan algorithm
+#  @param H transfer function 
+#  @param W weight function 
 #  @param n order of the filter
-#  @param maxiter maximum iteration
-#  @param step x axis resolution for calculation of the extrema
+#  @param maxiter maximum numbe of iterations
+#  @param eacc the algorithm will stop when the error changes between
+#         iterations is less than eacc%
+#  @param xtol x tolerance
+#  @param ytol y tolerance
+#  @param debug enable or disable the debug mode
 #  @return error and filter coefficients
 #
 #-------------------------------------------------------------------------------
-def parksMcClellan(H, n, maxiter = 100, \
+def parksMcClellan(H, W, n, maxiter = 100, \
                    eacc = 0.0001, wtol = 1e-4, ytol = 1e-8,
-                   debug = True):
+                   debug = True,
+                   firstExtChoice = "linear"):
     assert n%2 == 0, "n must be even" 
-    n = int(n/2)
-    extrema = np.cos(np.linspace(0, np.pi, num=(n+4), dtype = np.float64)[1:-1])
-    pm = np.array([(-1.0)**(i%2)  for i in range(1, len(extrema))])
-    d = delta(extrema, H)    
+    n  = int(n/2)
+    if firstExtChoice == "random":
+        x  = np.cos(np.linspace(0, np.pi, num = int(np.pi/wtol)))
+        weight = W(x)
+        extremal = np.random.choice(x, n + 2, p = weight/np.sum(weight))
+    elif firstExtChoice == "linear":
+        extremal = np.cos(np.linspace(0, np.pi, num = (n + 4)))[1:-1] 
+    else:
+        raise Exception("You must select a valid way to choose the inital" +\
+                        " extremal points")
+    pm = np.array([(-1.0)**(i%2)  for i in range(1, len(extremal))])
+    d = delta(extremal, H, W)    
     old_d = 1000
-    lagrange_int = lagrange(extrema[:-1], H(extrema[:-1]) + d*pm)
+    lagrange_int = lagrange(extremal[:-1], \
+                   H(extremal[:-1]) + pm*d/W(extremal[:-1]))
     iterations = 0
     while (old_d/d > (1 + eacc/100.0) or old_d/d < (1 - eacc/100.0)) and \
            iterations < maxiter:
-        extrema = findExtrema(lambda x: (H(x) - lagrange_int(x)), \
+        extremal = findExtrema(lambda x: (H(x) - lagrange_int(x))*W(x), \
                               n + 2, d, wtol, ytol, debug)
         old_d = d
-        d = delta(extrema, H)    
-        lagrange_int = lagrange(extrema[:-1], H(extrema[:-1]) + d*pm)
+        d = delta(extremal, H, W)    
+        lagrange_int = lagrange(extremal[:-1], \
+                       H(extremal[:-1]) + pm*d/W(extremal[:-1]))
         iterations = iterations + 1
     bk = Polynomial(lagrange_int.coef[::-1]).coef   
     tk = np.polynomial.chebyshev.poly2cheb(bk)
@@ -214,7 +313,11 @@ def parksMcClellan(H, n, maxiter = 100, \
 
 
 #-------------------------------------------------------------------------------
-# Filter plot
+## Filter plot
+#  @param H transfer function 
+#  @param hk filter impulse response
+#  @param title title
+#
 #-------------------------------------------------------------------------------
 def filterPlot(hk, H, title):
     w, h = signal.freqz(hk)
@@ -248,7 +351,7 @@ if __name__ == "__main__":
     n = 18
     H = lambda x: Hbp(np.cos(wstop1), np.cos(wpass1), \
                       np.cos(wpass2), np.cos(wstop2), x)
-    iterations, d, hk = parksMcClellan(H, n, debug = False)
+    iterations, d, hk = parksMcClellan(H, Wconst, n, debug = False)
     print("Filter coefficients: " + str(hk))
     print("Error: " + str(abs(d)))
     print("Iterations: " + str(abs(iterations)))
@@ -257,11 +360,12 @@ if __name__ == "__main__":
     #---------------------------------------------------------------------------
     # Low pass filter design
     #---------------------------------------------------------------------------
-    n = 50
-    wpass2 = 0.8*np.pi
-    wstop2 = 0.85*np.pi
+    n = 8
+    wpass2 = 0.3*np.pi
+    wstop2 = 0.8*np.pi
     H = lambda x: Hlp(np.cos(wpass2), np.cos(wstop2), x)
-    iterations, d, hk = parksMcClellan(H, n, debug = False)
+    W = lambda x: Wlp(np.cos(wpass2), np.cos(wstop2), x)
+    iterations, d, hk = parksMcClellan(H, W, n, debug = False)
     print("Filter coefficients: " + str(hk))
     print("Error: " + str(abs(d)))
     print("Iterations: " + str(abs(iterations)))
@@ -274,8 +378,7 @@ if __name__ == "__main__":
     wstop1 = 0.5*np.pi
     wpass1 = 0.6*np.pi
     H = lambda x: Hhp(np.cos(wstop1), np.cos(wpass1), x)
-
-    iterations, d, hk = parksMcClellan(H, n, debug = False)
+    iterations, d, hk = parksMcClellan(H, Wconst, n, debug = False)
     print("Filter coefficients: " + str(hk))
     print("Error: " + str(abs(d)))
     print("Iterations: " + str(abs(iterations)))
@@ -286,7 +389,7 @@ if __name__ == "__main__":
     #---------------------------------------------------------------------------
     n = 40
     H = lambda x: Hexp(x)
-    iterations, d, hk = parksMcClellan(H, n, debug = False)
+    iterations, d, hk = parksMcClellan(H, Wconst, n, debug = False)
     print("Filter coefficients: " + str(hk))
     print("Error: " + str(abs(d)))
     print("Iterations: " + str(abs(iterations)))
