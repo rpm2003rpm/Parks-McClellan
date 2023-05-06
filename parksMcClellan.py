@@ -155,7 +155,7 @@ def delta(extremal, H, W):
 #-------------------------------------------------------------------------------
 ## Find the extremal points. More experimentation is needed. It doesn't seems 
 #  to work for filters of high order
-#  @param E pointer to error weighted function
+#  @param E pointer to weighted error function
 #  @param m number of extreme points
 #  @param d calculated error
 #  @param xtol x tolerance
@@ -164,7 +164,7 @@ def delta(extremal, H, W):
 #  @return array of extremal points
 #
 #-------------------------------------------------------------------------------
-def findExtrema(E, m, d, wtol = 1e-5, ytol = 1e-7, debug = True):
+def findExtremal(E, m, d, wtol = 1e-5, ytol = 1e-7, debug = True):
     assert callable(E), "E must be callable"
     assert isinstance(m, int), "number of extreme points must be integer" 
     assert isinstance(d, float), "delta must be float" 
@@ -261,7 +261,7 @@ def findExtrema(E, m, d, wtol = 1e-5, ytol = 1e-7, debug = True):
         plt.xlabel("cos(w)")
         plt.ylabel("log10(abs(Weighted error))")
         if len(ext) == m:    
-            plt.title("Debug mode. Extremal points found.")
+            plt.title("Debug mode. Extremall points found.")
         else:
             plt.title("Couldn't find all the necessary extremall points")
         plt.show()
@@ -310,7 +310,7 @@ def parksMcClellan(H, W, n, maxiter = 100, \
     iterations = 0
     while (old_d/d > (1 + eacc/100.0) or old_d/d < (1 - eacc/100.0)) and \
            iterations < maxiter:
-        extremal = findExtrema(lambda x: (H(x) - lagrange_int(x))*W(x), \
+        extremal = findExtremal(lambda x: (H(x) - lagrange_int(x))*W(x), \
                                m + 2, d, wtol, ytol, debug)
         old_d = d
         d = delta(extremal, H, W)    
