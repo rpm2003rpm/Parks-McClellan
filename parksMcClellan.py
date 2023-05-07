@@ -38,7 +38,7 @@ from scipy import signal
 #-------------------------------------------------------------------------------
 ## Constant weight function
 #  @param x input vector
-#  @return output of the same size as the input vector fill-up with ones
+#  @return numpy array filled-up with ones
 #
 #-------------------------------------------------------------------------------
 def Wconst(x):
@@ -51,7 +51,7 @@ def Wconst(x):
 #  @param xpass pass frequency as a function of cos(wpass)
 #  @param xstop stop frequency as a function of cos(stop)
 #  @param x input vector
-#  @return np array representing the weight
+#  @return numpy array representing the weight
 #
 #-------------------------------------------------------------------------------
 def Wlp(xpass, xstop, x):
@@ -69,7 +69,7 @@ def Wlp(xpass, xstop, x):
 #  @param xpass pass frequency as a function of cos(wpass)
 #  @param xstop stop frequency as a function of cos(stop)
 #  @param x input vector
-#  @return np array representing the TF
+#  @return numpy array representing the transfer function
 #
 #-------------------------------------------------------------------------------
 def Hlp(xpass, xstop, x):
@@ -89,7 +89,7 @@ def Hlp(xpass, xstop, x):
 #  @param xstop stop frequency as a function of cos(stop)
 #  @param xpass pass frequency as a function of cos(wpass)
 #  @param x input vector
-#  @return np array representing the TF
+#  @return numpy array representing the transfer function
 #
 #-------------------------------------------------------------------------------
 def Hhp(xstop, xpass, x):
@@ -102,16 +102,16 @@ def Hhp(xstop, xpass, x):
 #  @param xpass2 2st pass frequency as a function of cos(wpass2)
 #  @param xstop2 2st stop frequency as a function of cos(stop2)
 #  @param x input vector
-#  @return np array representing the TF
+#  @return numpy array representing the transfer function
 #
 #-------------------------------------------------------------------------------
 def Hbp(xstop1, xpass1, xpass2, xstop2, x):
     return Hlp(xpass2, xstop2, x)*Hhp(xstop1, xpass1, x)
 
 #-------------------------------------------------------------------------------
-## TF of a filter for teesting
+## TF of a filter for testing
 #  @param x input vector
-#  @return np array representing the TF
+#  @return np array representing the transfer function
 #
 #-------------------------------------------------------------------------------
 def Hexp(x):
@@ -121,8 +121,8 @@ def Hexp(x):
 
 #-------------------------------------------------------------------------------
 ## Gamma
-#  @param k idex
-#  @param extremal frequencies
+#  @param k index
+#  @param extremal extremal frequencies
 #  @return gamma k
 #
 #-------------------------------------------------------------------------------
@@ -135,7 +135,7 @@ def gk(k, extremal):
     
 #-------------------------------------------------------------------------------
 ## Delta 
-#  @param extremal frequencies
+#  @param extremal extremal frequencies
 #  @param H transfer function 
 #  @param W weight function 
 #  @return real number representing the delta
@@ -150,53 +150,50 @@ def delta(extremal, H, W):
     return np.sum(gks*H(extremal))/np.sum(gks/W(extremal)*pm)
         
 #-------------------------------------------------------------------------------
-## Find the extremal points. More experimentation is needed. It doesn't seems 
-#  to work for filters of high order
+## Find the extremal points.
 #  @param E pointer to weighted error function
-#  @param m number of extreme points
+#  @param grid extremal points will be calculated based on E(grid)
+#  @param m number of extremal points
 #  @param d calculated error
-#  @param xtol x tolerance
 #  @param debug enable or disable the debug mode
 #  @return array of extremal points
 #
 #-------------------------------------------------------------------------------
-def findExtremal(E, m, d, wtol = 1e-5, debug = True):
+def findExtremal(E, grid, m, d, debug = True):
     assert callable(E), "E must be callable"
+    assert isinstance(grid, np.ndarray), "grid must be a ndarray"
     assert isinstance(m, int), "number of extreme points must be integer" 
     assert isinstance(d, float), "delta must be float" 
-    assert isinstance(wtol, float), "wtol must be float" 
     assert isinstance(debug, bool), "debug must be bool"
-    #Build an array of x points and calculate both the error and the differences
-    #Dont touch
-    x   = np.cos(np.linspace(0, np.pi, num = int(np.pi/wtol)))
-    err = E(x)
-    dif = np.diff(err)
-    x   = x[1:]
-    err = err[1:]
 
-    #Find the concavities and the edges
+    #Calculate the error
+    err = E(grid)
+
+    #Find the concavities and the index of the local min/max
+    dif = np.diff(err)
     sgn = np.zeros_like(dif)
     sgn[dif >= 0] = 1.0
     con = np.diff(sgn) 
-    edg = np.argwhere(con != 0)[:,0]
-    con = con[edg]
-    ext = x[edg]
+    ilm = np.argwhere(con != 0)[:,0]
+    x   = grid[1:-1]
+    err = err[1:-1]
+    con = con[ilm]
+    ext = x[ilm]
 
-    #Decide if the upper and lower bounds need to be added
-    #Skip if upper bound is already an extremal point
+    #Add upper bound if it isn't a candidate to extremal point
     if (ext < x[1]).all():
-        edg = np.insert(edg, 0, 0)
+        ilm = np.insert(ilm, 0, 0)
         con = np.insert(con, 0, -con[0])      
-    #Skip if lower bound is already an extremal point
+    #Add lower bound if it isn't a candidate to extremal point
     if (ext > x[-1]).all():
-        edg = np.append(edg, len(x) - 1)
+        ilm = np.append(ilm, len(x) - 1)
         con = np.append(con, -con[-1])      
-    ext = x[edg]
+    ext = x[ilm]
 
     #Debug and error
     if debug:
-        up  = edg[con > 0]
-        dwn = edg[con < 0] 
+        up  = ilm[con > 0]
+        dwn = ilm[con < 0] 
         plt.plot(np.arccos(x), err)
         plt.scatter(np.arccos(x[up]),  err[up])
         plt.scatter(np.arccos(x[dwn]), err[dwn])
@@ -205,12 +202,13 @@ def findExtremal(E, m, d, wtol = 1e-5, debug = True):
         plt.title("Candidate to extremal points.")
         plt.show()
 
-    #If an even number of points can be removed, remove the lower diff 
-    #between min/max
+    #Check if an even number of points can be removed and remove the lower 
+    #differences between the local min/max
     rm = int((len(ext) - m)/2)
     if rm > 0:
-        diffe = np.diff(err[edg])
+        diffe = np.diff(err[ilm])
         for i in range(0, rm):
+            #Not very efficient to sort everytime. It can be improved later.
             irm = np.argsort(np.absolute(diffe))[0]
             lrm = np.array([irm, irm + 1], dtype = np.int32)
             if irm != (len(diffe) - 1) and irm != 0:
@@ -219,20 +217,20 @@ def findExtremal(E, m, d, wtol = 1e-5, debug = True):
                 diffe = np.delete(diffe, lrm - 1)
             else:
                 diffe = np.delete(diffe, lrm)
-            edg   = np.delete(edg, lrm)
+            ilm   = np.delete(ilm, lrm)
             con   = np.delete(con, lrm)
             ext   = np.delete(ext, lrm)
 
-    #If we still need to remove one point, remove one of the lower or
-    #upper bounds
+    #If we still need to remove one last local min/max, remove one from the 
+    #upper or lower bound
     if len(ext) > m:
-        if abs(err[edg[0]] - err[edg[1]]) > abs(err[edg[-1]] - err[edg[-2]]):
+        if abs(err[ilm[0]] - err[ilm[1]]) > abs(err[ilm[-1]] - err[ilm[-2]]):
             ext = ext[:-1]  
-            edg = edg[:-1]  
+            ilm = ilm[:-1]  
             con = con[:-1]  
         else:
             ext = ext[1:]  
-            edg = edg[1:]  
+            ilm = ilm[1:]  
             con = con[1:]  
             
     #Double check alternation of concavities. Should hold by construction.
@@ -241,8 +239,8 @@ def findExtremal(E, m, d, wtol = 1e-5, debug = True):
 
     #Debug and error
     if debug or len(ext) != m:
-        up  = edg[con > 0]
-        dwn = edg[con < 0] 
+        up  = ilm[con > 0]
+        dwn = ilm[con < 0] 
         plt.plot(np.arccos(x), err)
         plt.scatter(np.arccos(x[up]),  err[up])
         plt.scatter(np.arccos(x[dwn]), err[dwn])
@@ -261,15 +259,15 @@ def findExtremal(E, m, d, wtol = 1e-5, debug = True):
 #  @param F function to be aproximated
 #  @param W weight function 
 #  @param extremal inital extremal points
-#  @param maxiter maximum numbe of iterations
+#  @param maxiter maximum number of iterations
 #  @param eacc the algorithm will stop when the error changes between
-#         iterations is less than eacc%
-#  @param wtol x tolerance
+#         iterations is less than eacc (%)
+#  @param wtol frequency tolerance
 #  @param debug enable or disable the debug mode
 #  @return error, extremal, lagrange polynomial
 #
 #-------------------------------------------------------------------------------
-def remez(F, W, extremal, 
+def remez(F, W, extremal,
           maxiter = 100, eacc = 0.0001, wtol = 1e-4, debug = True):
     assert callable(F), "F must be callable"
     assert callable(W), "W must be callable"
@@ -278,22 +276,32 @@ def remez(F, W, extremal,
     assert isinstance(eacc, float), "eacc must be float" 
     assert isinstance(wtol, float), "wtol must be float" 
     assert isinstance(debug, bool), "debug must be bool"
-    m2 = len(extremal)
-    pm = np.array([(-1.0)**(i%2)  for i in range(1, m2)])
-    d = delta(extremal, H, W)    
-    old_d = 1000
-    lagrange_int = lagrange(extremal[:-1], \
-                            H(extremal[:-1]) + pm*d/W(extremal[:-1]))
+    
+    #Initialize variables
+    m2         = len(extremal)
+    grid       = np.cos(np.linspace(0, np.pi, num = int(np.pi/wtol)))
+    pm         = np.array([(-1.0)**(i%2)  for i in range(1, m2)])
+    d          = delta(extremal, H, W)    
+    old_d      = 0
     iterations = 0
-    while (old_d/d > (1 + eacc/100.0) or old_d/d < (1 - eacc/100.0)) and \
-           iterations < maxiter:
-        extremal = findExtremal(lambda x: (H(x) - lagrange_int(x))*W(x), m2,\
-                                d, wtol, debug)
+    tolMax     = (1 + eacc/100.0)
+    tolMin     = (1 - eacc/100.0)
+    E          = lambda x: (H(x) - lagrange_int(x))*W(x)
+    
+    #Calculate initial lagrange interpolation
+    lagrange_int = lagrange(extremal[:-1],
+                            H(extremal[:-1]) + pm*d/W(extremal[:-1]))
+    
+    #Remez algorithm loop
+    while (old_d/d > tolMax or old_d/d < tolMin) and iterations < maxiter:
+        extremal = findExtremal(E, grid, m2, d, debug)
         old_d = d
         d = delta(extremal, H, W)    
         lagrange_int = lagrange(extremal[:-1], \
                                 H(extremal[:-1]) + pm*d/W(extremal[:-1]))
         iterations = iterations + 1
+    
+    #Return
     return extremal, iterations, d, lagrange_int
 
 #-------------------------------------------------------------------------------
@@ -304,7 +312,7 @@ def remez(F, W, extremal,
 #  @param maxiter maximum numbe of iterations
 #  @param eacc the algorithm will stop when the error changes between
 #         iterations is less than eacc%
-#  @param xtol x tolerance
+#  @param wtol frequency tolerance
 #  @param debug enable or disable the debug mode
 #  @return error and filter coefficients
 #
@@ -320,15 +328,23 @@ def parksMcClellan(H, W, n, maxiter = 100, \
     assert isinstance(wtol, float), "wtol must be float" 
     assert isinstance(debug, bool), "debug must be bool"
     assert n%2 == 0, "n must be even" 
+    #Polynomial order
     m = int(n/2)
+    
+    #Guess for the initial extremal points. Linear guess may cause convergence 
+    #problems. It need to be improved for better convergence for higher order 
+    #filters.
     ext = np.cos(np.linspace(0, np.pi, num = (m + 2)))
+    
+    #Run remez algorithm 
     ext, iterations, d, lgr = remez(H, W, ext, maxiter, eacc, wtol, debug)
+    
+    #Convert the lagrange interpolation into the filter step response
     bk = Polynomial(lgr.coef[::-1]).coef   
     tk = np.polynomial.chebyshev.poly2cheb(bk)
     hk = np.append(np.flip(tk[1:]/2.0), tk[0])
     hk = np.append(hk, tk[1:]/2.0)
     return iterations, d, hk
-
 
 #-------------------------------------------------------------------------------
 ## Filter plot
@@ -379,9 +395,9 @@ if __name__ == "__main__":
     filterPlot(hk, H, "Band pass frequency response")
 
     #---------------------------------------------------------------------------
-    # Low pass filter design. Result similar to matlab
+    # Low pass filter design. Result is similar to matlab
     # Change the weight function for higher order filter so no extremal
-    # is located in the transition
+    # will be located in the transition
     #---------------------------------------------------------------------------
     n = 14
     wpass2 = 0.3*np.pi
@@ -409,7 +425,7 @@ if __name__ == "__main__":
     filterPlot(hk, H, "High pass frequency response")
 
     #---------------------------------------------------------------------------
-    # Fancy filter
+    # Filter for testing
     #---------------------------------------------------------------------------
     n = 40
     H = lambda x: Hexp(x)
