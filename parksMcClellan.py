@@ -323,7 +323,7 @@ def parksMcClellan(H, W, n, maxiter = 100, \
     assert isinstance(debug, bool), "debug must be bool"
     assert n%2 == 0, "n must be even" 
     m = int(n/2)
-    ext = np.cos(np.linspace(0, np.pi, num = (m + 4)))[1:-1] 
+    ext = np.cos(np.linspace(0, np.pi, num = (m + 2)))
     ext, iterations, d, lgr = remez(H, W, m, ext, maxiter, eacc, wtol, debug)
     bk = Polynomial(lgr.coef[::-1]).coef   
     tk = np.polynomial.chebyshev.poly2cheb(bk)
@@ -371,7 +371,7 @@ if __name__ == "__main__":
     #---------------------------------------------------------------------------
     # Band pass design
     #---------------------------------------------------------------------------
-    n = 40
+    n = 50
     H = lambda x: Hbp(np.cos(wstop1), np.cos(wpass1), \
                       np.cos(wpass2), np.cos(wstop2), x)
     iterations, d, hk = parksMcClellan(H, Wconst, n, debug = False)
