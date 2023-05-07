@@ -260,28 +260,26 @@ def findExtremal(E, m, d, wtol = 1e-5, debug = True):
 ## remex algorithm
 #  @param F function to be aproximated
 #  @param W weight function 
-#  @param m order of the polynomial
 #  @param extremal inital extremal points
 #  @param maxiter maximum numbe of iterations
 #  @param eacc the algorithm will stop when the error changes between
 #         iterations is less than eacc%
 #  @param wtol x tolerance
 #  @param debug enable or disable the debug mode
-#  @return error, extremal, polynomial coefficients
+#  @return error, extremal, lagrange polynomial
 #
 #-------------------------------------------------------------------------------
-def remez(F, W, m, extremal, maxiter = 100, \
-                             eacc = 0.0001, wtol = 1e-4,
-                             debug = True):
+def remez(F, W, extremal, 
+          maxiter = 100, eacc = 0.0001, wtol = 1e-4, debug = True):
     assert callable(F), "F must be callable"
     assert callable(W), "W must be callable"
-    assert isinstance(m, int), "polynomial order must be integer" 
     assert isinstance(extremal, np.ndarray), "extremal must be a ndarray" 
     assert isinstance(maxiter, int), "maximum iteration must be integer" 
     assert isinstance(eacc, float), "eacc must be float" 
     assert isinstance(wtol, float), "wtol must be float" 
     assert isinstance(debug, bool), "debug must be bool"
-    pm = np.array([(-1.0)**(i%2)  for i in range(1, len(extremal))])
+    m2 = len(extremal)
+    pm = np.array([(-1.0)**(i%2)  for i in range(1, m2)])
     d = delta(extremal, H, W)    
     old_d = 1000
     lagrange_int = lagrange(extremal[:-1], \
@@ -289,8 +287,8 @@ def remez(F, W, m, extremal, maxiter = 100, \
     iterations = 0
     while (old_d/d > (1 + eacc/100.0) or old_d/d < (1 - eacc/100.0)) and \
            iterations < maxiter:
-        extremal = findExtremal(lambda x: (H(x) - lagrange_int(x))*W(x), \
-                                m + 2, d, wtol, debug)
+        extremal = findExtremal(lambda x: (H(x) - lagrange_int(x))*W(x), m2,\
+                                d, wtol, debug)
         old_d = d
         d = delta(extremal, H, W)    
         lagrange_int = lagrange(extremal[:-1], \
@@ -324,7 +322,7 @@ def parksMcClellan(H, W, n, maxiter = 100, \
     assert n%2 == 0, "n must be even" 
     m = int(n/2)
     ext = np.cos(np.linspace(0, np.pi, num = (m + 2)))
-    ext, iterations, d, lgr = remez(H, W, m, ext, maxiter, eacc, wtol, debug)
+    ext, iterations, d, lgr = remez(H, W, ext, maxiter, eacc, wtol, debug)
     bk = Polynomial(lgr.coef[::-1]).coef   
     tk = np.polynomial.chebyshev.poly2cheb(bk)
     hk = np.append(np.flip(tk[1:]/2.0), tk[0])
