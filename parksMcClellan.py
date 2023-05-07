@@ -65,11 +65,11 @@ def Wlp(xpass, xstop, x):
     return y
     
 #-------------------------------------------------------------------------------
-## Transfer function of a low pass filter
+## Ideal ideal transfer function of a low pass filter
 #  @param xpass pass frequency as a function of cos(wpass)
 #  @param xstop stop frequency as a function of cos(stop)
 #  @param x input vector
-#  @return numpy array representing the transfer function
+#  @return numpy array representing the ideal transfer function
 #
 #-------------------------------------------------------------------------------
 def Hlp(xpass, xstop, x):
@@ -85,24 +85,24 @@ def Hlp(xpass, xstop, x):
     return y
 
 #-------------------------------------------------------------------------------
-## Transfer function of a high pass filter
+## Ideal ideal transfer function of a high pass filter
 #  @param xstop stop frequency as a function of cos(stop)
 #  @param xpass pass frequency as a function of cos(wpass)
 #  @param x input vector
-#  @return numpy array representing the transfer function
+#  @return numpy array representing the ideal transfer function
 #
 #-------------------------------------------------------------------------------
 def Hhp(xstop, xpass, x):
     return 1.0 - Hlp(xstop, xpass, x)
 
 #-------------------------------------------------------------------------------
-## Transfer function of a band pass filter
+## Ideal ideal transfer function of a band pass filter
 #  @param xstop1 1st stop frequency as a function of cos(stop1)
 #  @param xpass1 1st pass frequency as a function of cos(wpass1)
 #  @param xpass2 2st pass frequency as a function of cos(wpass2)
 #  @param xstop2 2st stop frequency as a function of cos(stop2)
 #  @param x input vector
-#  @return numpy array representing the transfer function
+#  @return numpy array representing the ideal transfer function
 #
 #-------------------------------------------------------------------------------
 def Hbp(xstop1, xpass1, xpass2, xstop2, x):
@@ -111,7 +111,7 @@ def Hbp(xstop1, xpass1, xpass2, xstop2, x):
 #-------------------------------------------------------------------------------
 ## TF of a filter for testing
 #  @param x input vector
-#  @return np array representing the transfer function
+#  @return np array representing the ideal transfer function
 #
 #-------------------------------------------------------------------------------
 def Hexp(x):
@@ -136,7 +136,7 @@ def gk(k, extremal):
 #-------------------------------------------------------------------------------
 ## Delta 
 #  @param extremal extremal frequencies
-#  @param H transfer function 
+#  @param H ideal transfer function 
 #  @param W weight function 
 #  @return real number representing the delta
 #
@@ -180,17 +180,17 @@ def findExtremal(E, grid, m, d, debug = True):
     con = con[ilm]
     ext = x[ilm]
 
-    #Add upper bound if it isn't a candidate to extremal point
+    #Add x[0] if it isn't a candidate to extremal point yet
     if (ext < x[1]).all():
         ilm = np.insert(ilm, 0, 0)
         con = np.insert(con, 0, -con[0])      
-    #Add lower bound if it isn't a candidate to extremal point
+    #Add x[len-1] if it isn't a candidate to extremal point yet
     if (ext > x[-1]).all():
         ilm = np.append(ilm, len(x) - 1)
         con = np.append(con, -con[-1])      
     ext = x[ilm]
 
-    #Debug and error
+    #Debug
     if debug:
         up  = ilm[con > 0]
         dwn = ilm[con < 0] 
@@ -306,7 +306,7 @@ def remez(F, W, extremal,
 
 #-------------------------------------------------------------------------------
 ## parksMcClellan algorithm
-#  @param H transfer function 
+#  @param H ideal transfer function 
 #  @param W weight function 
 #  @param n order of the filter
 #  @param maxiter maximum numbe of iterations
@@ -348,7 +348,7 @@ def parksMcClellan(H, W, n, maxiter = 100, \
 
 #-------------------------------------------------------------------------------
 ## Filter plot
-#  @param H transfer function 
+#  @param H ideal transfer function 
 #  @param hk filter impulse response
 #  @param title title
 #
