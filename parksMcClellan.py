@@ -209,11 +209,13 @@ def findExtremal(E, grid, m, d, debug = False):
                                                    dif, 
                                                    [1])) == 0)).reshape(-1,2)
     sgn = np.zeros_like(dif)
-    sgn[dif >= 0] = 1.0
+    sgn[dif > 0] = 1.0
     for i in izerolist:
         iavg = int((i[0] + i[1])/2.0)
         if i[0] > 0:
             sgn[i[0]:iavg] = sgn[i[0] - 1] 
+        elif i[1] < len(sgn):
+            sgn[i[0]:iavg] = sgn[i[1]]
         if i[1] < len(sgn):
             sgn[iavg:i[1]] = sgn[i[1]]
         elif i[0] > 0:
