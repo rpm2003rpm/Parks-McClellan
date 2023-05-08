@@ -85,6 +85,24 @@ def Hlp(xpass, xstop, x):
     return y
 
 #-------------------------------------------------------------------------------
+## Weight function of a high pass filter
+#  @param xpass pass frequency as a function of cos(wpass)
+#  @param xstop stop frequency as a function of cos(stop)
+#  @param x input vector
+#  @return numpy array representing the weight
+#
+#-------------------------------------------------------------------------------
+def Whp(xstop, xpass, x):
+    assert xstop >= -1 or xstop <= 1, "xstop is out of range"
+    assert xpass >= -1 or xpass <= 1, "xpass is out of range"
+    assert isinstance(x, np.ndarray), "x must be a numpy array" 
+    assert ((x >= -1) | (x <= 1)).all(), "x is out of range"
+    y= np.ones_like(x)
+    mask = (x < xstop) & (x > xpass)
+    y[mask] = 0.002
+    return y
+
+#-------------------------------------------------------------------------------
 ## Ideal ideal transfer function of a high pass filter
 #  @param xstop stop frequency as a function of cos(stop)
 #  @param xpass pass frequency as a function of cos(wpass)
@@ -94,6 +112,18 @@ def Hlp(xpass, xstop, x):
 #-------------------------------------------------------------------------------
 def Hhp(xstop, xpass, x):
     return 1.0 - Hlp(xstop, xpass, x)
+
+#-------------------------------------------------------------------------------
+## Weight function of a band pass filter
+#  @param xstop1 1st stop frequency as a function of cos(stop1)
+#  @param xpass1 1st pass frequency as a function of cos(wpass1)
+#  @param xpass2 2st pass frequency as a function of cos(wpass2)
+#  @param xstop2 2st stop frequency as a function of cos(stop2)
+#  @return numpy array representing the weight
+#
+#-------------------------------------------------------------------------------
+def Wbp(xstop1, xpass1, xpass2, xstop2, x):
+    return Wlp(xpass2, xstop2, x)*Whp(xstop1, xpass1, x)
 
 #-------------------------------------------------------------------------------
 ## Ideal ideal transfer function of a band pass filter
@@ -159,7 +189,7 @@ def delta(extremal, H, W):
 #  @return array of extremal points
 #
 #-------------------------------------------------------------------------------
-def findExtremal(E, grid, m, d, debug = True):
+def findExtremal(E, grid, m, d, debug = False):
     assert callable(E), "E must be callable"
     assert isinstance(grid, np.ndarray), "grid must be a ndarray"
     assert isinstance(m, int), "number of extreme points must be integer" 
@@ -169,10 +199,27 @@ def findExtremal(E, grid, m, d, debug = True):
     #Calculate the error
     err = E(grid)
 
-    #Find the concavities and the index of the local min/max
+    #Calculate the difference between the errors
     dif = np.diff(err)
+
+    #If dif > 0, sgn will be equal 1. If dif < 0, sgn will be equal to 0
+    #If dif == 0 half of the range of sgn will be equal to 1 e half will be 
+    #equal to 0 (split the difference)
+    izerolist = np.argwhere(np.diff(np.concatenate(([1], 
+                                                   dif, 
+                                                   [1])) == 0)).reshape(-1,2)
     sgn = np.zeros_like(dif)
     sgn[dif >= 0] = 1.0
+    for i in izerolist:
+        iavg = int((i[0] + i[1])/2.0)
+        if i[0] > 0:
+            sgn[i[0]:iavg] = sgn[i[0] - 1] 
+        if i[1] < len(sgn):
+            sgn[iavg:i[1]] = sgn[i[1]]
+        elif i[0] > 0:
+            sgn[iavg:i[1]] = sgn[i[0] - 1] 
+
+    #Calculate the concavities and the candidates to extremal points
     con = np.diff(sgn) 
     ilm = np.argwhere(con != 0)[:,0]
     x   = grid[1:-1]
@@ -184,9 +231,9 @@ def findExtremal(E, grid, m, d, debug = True):
     if (ext < x[1]).all():
         ilm = np.insert(ilm, 0, 0)
         con = np.insert(con, 0, -con[0])      
-    #Add x[len-1] if it isn't a candidate to extremal point yet
+    #Add x[-1] if it isn't a candidate to extremal point yet
     if (ext > x[-1]).all():
-        ilm = np.append(ilm, len(x) - 1)
+        ilm = np.append(ilm, - 1)
         con = np.append(con, -con[-1])      
     ext = x[ilm]
 
@@ -268,7 +315,7 @@ def findExtremal(E, grid, m, d, debug = True):
 #
 #-------------------------------------------------------------------------------
 def remez(F, W, extremal,
-          maxiter = 100, eacc = 0.0001, wtol = 1e-4, debug = True):
+          maxiter = 100, eacc = 0.0001, wtol = 1e-4, debug = False):
     assert callable(F), "F must be callable"
     assert callable(W), "W must be callable"
     assert isinstance(extremal, np.ndarray), "extremal must be a ndarray" 
@@ -319,7 +366,7 @@ def remez(F, W, extremal,
 #-------------------------------------------------------------------------------
 def parksMcClellan(H, W, n, maxiter = 100, \
                    eacc = 0.0001, wtol = 1e-4,
-                   debug = True):
+                   debug = False):
     assert callable(H), "H must be callable"
     assert callable(W), "W must be callable"
     assert isinstance(n, int), "filter order must be integer" 
@@ -385,7 +432,7 @@ if __name__ == "__main__":
     #---------------------------------------------------------------------------
     # Band pass design
     #---------------------------------------------------------------------------
-    n = 50
+    n = 30
     H = lambda x: Hbp(np.cos(wstop1), np.cos(wpass1), \
                       np.cos(wpass2), np.cos(wstop2), x)
     iterations, d, hk = parksMcClellan(H, Wconst, n, debug = False)
