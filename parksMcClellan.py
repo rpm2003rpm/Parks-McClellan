@@ -222,27 +222,24 @@ def findExtremal(E, grid, m, d, debug = False):
             sgn[iavg:i[1]] = sgn[i[0] - 1] 
 
     #Calculate the concavities and the candidates to extremal points
-    con = np.diff(sgn) 
-    ilm = np.argwhere(con != 0)[:,0]
-    x   = grid[1:-1]
-    err = err[1:-1]
-    con = con[ilm]
-    ext = x[ilm]
+    con  = np.diff(sgn) 
+    iext = np.argwhere(con != 0)[:,0]
+    x    = grid[1:-1]
+    err  = err[1:-1]
 
     #Add x[0] if it isn't a candidate to extremal point yet
-    if (ext < x[1]).all():
-        ilm = np.insert(ilm, 0, 0)
-        con = np.insert(con, 0, -con[0])      
+    if not (0 in iext):
+        con[0] = -con[iext[0]]   
+        iext   = np.insert(iext, 0, 0)   
     #Add x[-1] if it isn't a candidate to extremal point yet
-    if (ext > x[-1]).all():
-        ilm = np.append(ilm, - 1)
-        con = np.append(con, -con[-1])      
-    ext = x[ilm]
+    if not ((len(x) - 1) in iext):
+        con[-1] = -con[iext[-1]]   
+        iext    = np.append(iext, - 1)
 
     #Debug
     if debug:
-        up  = ilm[con > 0]
-        dwn = ilm[con < 0] 
+        up  = iext[con[iext] > 0]
+        dwn = iext[con[iext] < 0] 
         plt.plot(np.arccos(x), err)
         plt.scatter(np.arccos(x[up]),  err[up])
         plt.scatter(np.arccos(x[dwn]), err[dwn])
@@ -253,9 +250,9 @@ def findExtremal(E, grid, m, d, debug = False):
 
     #Check if an even number of points can be removed and remove the lower 
     #differences between the local min/max
-    rm = int((len(ext) - m)/2)
+    rm = int((len(iext) - m)/2)
     if rm > 0:
-        diffe = np.diff(err[ilm])
+        diffe = np.diff(err[iext])
         for i in range(0, rm):
             #Not very efficient to sort everytime. It can be improved later.
             irm = np.argsort(np.absolute(diffe))[0]
@@ -266,42 +263,36 @@ def findExtremal(E, grid, m, d, debug = False):
                 diffe = np.delete(diffe, lrm - 1)
             else:
                 diffe = np.delete(diffe, lrm)
-            ilm   = np.delete(ilm, lrm)
-            con   = np.delete(con, lrm)
-            ext   = np.delete(ext, lrm)
+            iext = np.delete(iext, lrm)
 
     #If we still need to remove one last local min/max, remove one from the 
     #upper or lower bound
-    if len(ext) > m:
-        if abs(err[ilm[0]] - err[ilm[1]]) > abs(err[ilm[-1]] - err[ilm[-2]]):
-            ext = ext[:-1]  
-            ilm = ilm[:-1]  
-            con = con[:-1]  
+    if len(iext) > m:
+        if abs(err[iext[0]] - err[iext[1]]) > abs(err[iext[-1]] - err[iext[-2]]):
+            iext = iext[:-1]  
         else:
-            ext = ext[1:]  
-            ilm = ilm[1:]  
-            con = con[1:]  
+            iext = iext[1:]  
             
     #Double check alternation of concavities. Should hold by construction.
-    pm = np.array([(-1.0)**(i%2)  for i in range(0, len(con))])
-    assert (np.diff(pm*con) == 0).all(), "Ops.... " 
+    pm = np.array([(-1.0)**(i%2)  for i in range(0, len(iext))])
+    assert (np.diff(pm*con[iext]) == 0).all(), "Ops.... " 
 
     #Debug and error
-    if debug or len(ext) != m:
-        up  = ilm[con > 0]
-        dwn = ilm[con < 0] 
+    if debug or len(iext) != m:
+        up  = iext[con[iext] > 0]
+        dwn = iext[con[iext] < 0] 
         plt.plot(np.arccos(x), err)
         plt.scatter(np.arccos(x[up]),  err[up])
         plt.scatter(np.arccos(x[dwn]), err[dwn])
         plt.xlabel("w(rad/s)")
         plt.ylabel("log10(abs(Weighted error))")
-        if len(ext) == m:    
+        if len(iext) == m:    
             plt.title("Debug mode. Extremal points found.")
         else:
             plt.title("Couldn't find all the necessary extremal points")
         plt.show()
-    assert len(ext) == m, "Somerring went wrong"
-    return ext
+    assert len(iext) == m, "Somerring went wrong"
+    return x[iext]
 
 #-------------------------------------------------------------------------------
 ## remex algorithm
