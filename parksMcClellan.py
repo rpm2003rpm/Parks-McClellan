@@ -189,7 +189,7 @@ def delta(extremal, H, W):
 #  @return array of extremal points
 #
 #-------------------------------------------------------------------------------
-def findExtremal(E, grid, m, d, debug = False):
+def findExtremal(E, grid, m, d, debug = True):
     assert callable(E), "E must be callable"
     assert isinstance(grid, np.ndarray), "grid must be a ndarray"
     assert isinstance(m, int), "number of extreme points must be integer" 
@@ -308,7 +308,7 @@ def findExtremal(E, grid, m, d, debug = False):
 #
 #-------------------------------------------------------------------------------
 def remez(F, W, extremal,
-          maxiter = 100, eacc = 0.0001, wtol = 1e-4, debug = False):
+          maxiter = 100, eacc = 0.0001, wtol = 1e-4, debug = True):
     assert callable(F), "F must be callable"
     assert callable(W), "W must be callable"
     assert isinstance(extremal, np.ndarray), "extremal must be a ndarray" 
@@ -359,7 +359,7 @@ def remez(F, W, extremal,
 #-------------------------------------------------------------------------------
 def parksMcClellan(H, W, n, maxiter = 100, \
                    eacc = 0.0001, wtol = 1e-4,
-                   debug = False):
+                   debug = True):
     assert callable(H), "H must be callable"
     assert callable(W), "W must be callable"
     assert isinstance(n, int), "filter order must be integer" 
@@ -428,7 +428,7 @@ if __name__ == "__main__":
     n = 30
     H = lambda x: Hbp(np.cos(wstop1), np.cos(wpass1), \
                       np.cos(wpass2), np.cos(wstop2), x)
-    iterations, d, hk = parksMcClellan(H, Wconst, n, debug = False)
+    iterations, d, hk = parksMcClellan(H, Wconst, n, debug = True)
     print("Filter coefficients: " + str(hk))
     print("Error: " + str(abs(d)))
     print("Iterations: " + str(abs(iterations)))
@@ -445,7 +445,7 @@ if __name__ == "__main__":
     H = lambda x: Hlp(np.cos(wpass2), np.cos(wstop2), x)
     W = lambda x: Wlp(np.cos(wpass2), np.cos(wstop2), x)
     iterations, d, hk = parksMcClellan(H, W, n, \
-                                       wtol = 1e-6, debug = False)
+                                       wtol = 1e-6, debug = True)
     print("Filter coefficients: " + str(hk))
     print("Error: " + str(abs(d)))
     print("Iterations: " + str(abs(iterations)))
@@ -458,7 +458,7 @@ if __name__ == "__main__":
     wstop1 = 0.5*np.pi
     wpass1 = 0.6*np.pi
     H = lambda x: Hhp(np.cos(wstop1), np.cos(wpass1), x)
-    iterations, d, hk = parksMcClellan(H, Wconst, n, debug = False)
+    iterations, d, hk = parksMcClellan(H, Wconst, n, debug = True)
     print("Filter coefficients: " + str(hk))
     print("Error: " + str(abs(d)))
     print("Iterations: " + str(abs(iterations)))
@@ -469,7 +469,7 @@ if __name__ == "__main__":
     #---------------------------------------------------------------------------
     n = 40
     H = lambda x: Hexp(x)
-    iterations, d, hk = parksMcClellan(H, Wconst, n, debug = False)
+    iterations, d, hk = parksMcClellan(H, Wconst, n, debug = True)
     print("Filter coefficients: " + str(hk))
     print("Error: " + str(abs(d)))
     print("Iterations: " + str(abs(iterations)))
